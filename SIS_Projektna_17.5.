@@ -49,7 +49,7 @@ def transform(frame, kernel):
     frame = add_noise(frame, noise_level=1)
     frame = apply_blur(frame)
     frame = apply_color_filter(frame)
-    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) #Grayscale filter, kak želita uporabita
     frame = apply_convolution(frame, kernel)
     return frame
 
