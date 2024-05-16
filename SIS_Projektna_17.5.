@@ -1,7 +1,7 @@
 """Vsak si izbere 2 funkciji:
-Nika: Svetloba, blur
-Alen: Color_filter in rotation
-Dominik: Konvolucija in noise"""
+Nika: Konvolucija in Svetloba, blur
+Alen: Konvolucija in Color_filter in rotation
+Dominik: Konvolucija in noise in kontrast"""
 
 import cv2
 import numpy as np
