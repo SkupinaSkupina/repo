@@ -1,0 +1,70 @@
+"""Vsak si izbere 2 funkciji:
+Nika: Svetloba, blur
+Alen: Color_filter in rotation
+Dominik: Konvolucija in noise"""
+
+import cv2
+import numpy as np
+import imageio
+from scipy.signal import convolve2d
+
+def random_rotation(image):
+    angle = np.random.randint(-5, 5)
+    h, w = image.shape[:2]
+    center = (w // 2, h // 2)
+    M = cv2.getRotationMatrix2D(center, angle, 1.0)
+    rotated_image = cv2.warpAffine(image, M, (w, h))
+    return rotated_image
+
+def adjust_brightness(image):
+    factor = 1.0 + np.random.uniform(-0.1, 0.1)
+    return cv2.convertScaleAbs(image, alpha=factor, beta=0)
+
+def add_noise(image, noise_level=1):
+    noise = np.random.randn(*image.shape) * noise_level
+    noisy_image = image + noise.astype(np.uint8)
+    return np.clip(noisy_image, 0, 255)
+
+def apply_blur(image, kernel_size=(5, 5)):
+    return cv2.GaussianBlur(image, kernel_size, 0)
+
+def apply_color_filter(image, increase_saturation=True, change_hue=True):
+    hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    h, s, v = cv2.split(hsv_image)
+    if change_hue:
+        h = (h + 15) % 180  # Spremeni odtenek za 15 stopinj
+    if increase_saturation:
+        s = cv2.add(s, 40)  # Povečaj nasičenost
+    hsv_image = cv2.merge([h, s, v])
+    return cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
+
+def apply_convolution(image, kernel):
+    image = image.astype(np.float32)
+    convolved_image = convolve2d(image, kernel, boundary='symm', mode='same')
+    return convolved_image.astype(np.uint8)
+
+def transform(frame, kernel):
+    frame = random_rotation(frame)
+    frame = adjust_brightness(frame)
+    frame = add_noise(frame, noise_level=1)
+    frame = apply_blur(frame)
+    frame = apply_color_filter(frame)
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    frame = apply_convolution(frame, kernel)
+    return frame
+
+def process_video(input_video_path, output_video_path, kernel):
+    reader = imageio.get_reader(input_video_path)
+    fps = reader.get_meta_data()['fps']
+    frame_size = (reader.get_meta_data()['size'][0], reader.get_meta_data()['size'][1])
+    writer = imageio.get_writer(output_video_path, fps=fps)
+
+    for frame in reader:
+        frame = transform(frame, kernel)
+        writer.append_data(frame)
+
+    writer.close()
+
+if __name__ == '__main__':
+    kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
+    process_video('VIDEO.mp4', 'output_video.mp4', kernel)
