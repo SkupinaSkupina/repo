@@ -10,7 +10,8 @@
 
 # **Navodila za uporabo prototipa:**
   Najprej si nalozi vse knjiznice za python interpreter:  
-    `pip install -r requirements.txt`  
+      `pip install -r requirements.txt`
+      
   Nato lahko zazenes main.py  
-    cmd: `py main.py`  
-    ali preko IDE
+      cmd: `py main.py`  
+      ali preko IDE
