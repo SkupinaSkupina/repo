@@ -28,39 +28,32 @@ class VideoApp:
         self.source_label = tk.Label(root, text="No video selected", bg=bg_color, fg=text_color)
         self.source_label.pack(pady=5)
 
+        # Frame information
+        self.frame_info_label = tk.Label(root, text="Frame: 0/0", bg=bg_color, fg=text_color)
+        self.frame_info_label.pack(pady=5)
+
         # Main frame
         self.main_frame = tk.Frame(root, bg=bg_color, borderwidth=0, highlightthickness=0)
         self.main_frame.pack(fill=tk.BOTH, expand=True)
-        #self.main_frame.config(borderwidth=1, relief="solid", border=1, highlightbackground="white", highlightcolor="white")
-
 
         # Configure grid weights
+        for i in range(4):
+            self.main_frame.grid_rowconfigure(i, weight=1)
         self.main_frame.grid_columnconfigure(0, weight=3)
         self.main_frame.grid_columnconfigure(1, weight=1)
-        self.main_frame.grid_rowconfigure(0, weight=1)
-        self.main_frame.grid_rowconfigure(1, weight=1)
-        self.main_frame.grid_rowconfigure(2, weight=1)
-        self.main_frame.grid_rowconfigure(3, weight=1)
 
         # Canvas for video output
         self.canvas = tk.Canvas(self.main_frame, width=800, height=450, bg="#202020", borderwidth=0, highlightthickness=0)
-        self.canvas.grid(row=0, column=0, rowspan=3, padx=20, pady=20, sticky='nsew')
+        self.canvas.grid(row=0, column=0, rowspan=3, columnspan=3, padx=20, pady=20, sticky='nsew')
 
-        # Frame information
-        self.frame_info_label = tk.Label(self.main_frame, text="Frame: 0/0", bg=bg_color, fg=text_color)
-        self.frame_info_label.grid(row=0, column=1, padx=20, pady=5, sticky='nsew')
+        # Text frame
+        text_frame = tk.Frame(self.main_frame, bg=bg_color)
+        text_frame.grid(row=3, column=0, columnspan=2, padx=20, pady=(0, 20))
 
-        # Text box for object count
-        self.text_box = tk.Text(self.main_frame, state=tk.DISABLED, height=10, width=30, bg=accent_color, fg=text_color, wrap=tk.WORD)
-        self.text_box.grid(row=1, column=1, padx=20, pady=10, sticky='nsew')
-
-        # Text box for area information
-        self.area_text_box = tk.Text(self.main_frame, state=tk.DISABLED, height=10, width=30, bg=accent_color, fg=text_color, wrap=tk.WORD)
-        self.area_text_box.grid(row=2, column=1, padx=20, pady=10, sticky='nsew')
-
-        # Text box for proximity messages
-        self.proximity_text_box = tk.Text(self.main_frame, state=tk.DISABLED, height=10, width=65, bg=accent_color, fg=text_color, wrap=tk.WORD)
-        self.proximity_text_box.grid(row=3, column=0, columnspan=2, padx=20, pady=10, sticky='nsew')
+        # Text boxes
+        self.proximity_text_box = self.create_text_box(text_frame, height=10, width=65, side=tk.LEFT)
+        self.text_box = self.create_text_box(text_frame, height=10, width=30)
+        self.area_text_box = self.create_text_box(text_frame, height=10, width=30)
 
         self.initialize_textboxes()
 
@@ -73,6 +66,12 @@ class VideoApp:
         # Coordinates of the line
         self.line_y = 450  # Adjust this value as needed
         self.line_color = (255, 0, 0)  # Red color
+
+    def create_text_box(self, parent, height, width, side=tk.LEFT):
+        """Create and return a text box with given parameters."""
+        text_box = tk.Text(parent, state=tk.DISABLED, height=height, width=width, bg="#535353", fg="#FFFFFF", wrap=tk.WORD)
+        text_box.pack(side=side, padx=(0, 10))
+        return text_box
 
     def initialize_textboxes(self):
         for textbox in [self.text_box, self.area_text_box, self.proximity_text_box]:
@@ -194,14 +193,19 @@ class VideoApp:
             frame = cv2.putText(frame, f"{distance} px", bottom_center, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
             # Determine message based on distance
-            if distance < 70:
+            if distance < 50:
                 messages.append(f"Stop immediately! {name} is too close!")
+                self.proximity_text_box.config(state=tk.DISABLED, fg="white", bg="red")
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), -1)
             elif 70 <= distance < 100:
-                               messages.append(f"Warning! Pay attention to {name}.")
+                messages.append(f"Warning! Pay attention to {name}.")
+                self.proximity_text_box.config(state=tk.DISABLED, fg="orange", bg="#535353")
             elif 100 <= distance < 150:
                 messages.append(f"Getting close to {name}.")
-            elif distance >= 150:
+                self.proximity_text_box.config(state=tk.DISABLED, fg="yellow", bg="#535353")
+            elif distance < 250:
                 messages.append(f"Approaching {name}.")
+                self.proximity_text_box.config(state=tk.DISABLED, fg="lime", bg="#535353")
 
         self.update_proximity_textbox(messages)
         return frame
@@ -255,4 +259,3 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = VideoApp(root)
     root.mainloop()
-
