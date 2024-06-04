@@ -6,17 +6,18 @@ from PIL import Image, ImageTk
 import torch
 import numpy as np
 
+
 class VideoApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Yolo Object Detection Prototype")
-        self.root.geometry('1200x800')  # Increased size to accommodate new textbox
+        self.root.geometry('1200x800')
 
         # Styling variables
-        bg_color = "#353535"  # Dark background for a modern look
+        bg_color = "#353535"
         accent_color = "#535353"
         text_color = "#FFFFFF"
-        button_color = "darkcyan"  # Accent color for buttons and highlights
+        button_color = "darkcyan"
 
         self.root.config(bg=bg_color)
 
@@ -43,7 +44,8 @@ class VideoApp:
         self.main_frame.grid_columnconfigure(1, weight=1)
 
         # Canvas for video output
-        self.canvas = tk.Canvas(self.main_frame, width=800, height=450, bg="#202020", borderwidth=0, highlightthickness=0)
+        self.canvas = tk.Canvas(self.main_frame, width=800, height=450, bg="#202020", borderwidth=0,
+                                highlightthickness=0)
         self.canvas.grid(row=0, column=0, rowspan=3, columnspan=3, padx=20, pady=20, sticky='nsew')
 
         # Text frame
@@ -61,15 +63,24 @@ class VideoApp:
 
         # Load YOLOv5 model, using GPU if available
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        self.model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True).to(self.device)
+        self.model = torch.hub.load('ultralytics/yolov5', 'custom', path='yolov5custom.pt').to(self.device)
 
         # Coordinates of the line
         self.line_y = 450  # Adjust this value as needed
         self.line_color = (255, 0, 0)  # Red color
 
+        # Define colors for different classes
+        self.class_colors = {
+            'person': (255, 0, 0),  # Blue
+            'ball': (0, 255, 255),  # Yellow
+            'tree': (0, 255, 0),  # Green
+            'car': (0, 0, 255)  # Red
+        }
+
     def create_text_box(self, parent, height, width, side=tk.LEFT):
         """Create and return a text box with given parameters."""
-        text_box = tk.Text(parent, state=tk.DISABLED, height=height, width=width, bg="#535353", fg="#FFFFFF", wrap=tk.WORD)
+        text_box = tk.Text(parent, state=tk.DISABLED, height=height, width=width, bg="#535353", fg="#FFFFFF",
+                           wrap=tk.WORD)
         text_box.pack(side=side, padx=(0, 10))
         return text_box
 
@@ -102,7 +113,6 @@ class VideoApp:
         Thread(target=self.process_frame).start()
 
     def process_frame(self):
-        target_classes = [0, 2, 37]  # person, car, sports ball
         passed_frames = 0
 
         while self.cap.isOpened():
@@ -112,34 +122,31 @@ class VideoApp:
 
             passed_frames += 1
 
-            # Resize frame to 800x450 (16:9) for performance
+            # Size of video frame
             frame = cv2.resize(frame, (800, 450))
 
             # Perform object detection
-            results = self.model(frame, size=640)  # Ensure the model processes the resized frame
+            results = self.model(frame, size=640)
 
-            # Filter results for specific classes
+            # Filter results
             detected_classes = results.pred[0][:, -1].cpu().numpy()
             detected_boxes = results.pred[0][:, :4].cpu().numpy()
             detected_confidences = results.pred[0][:, 4].cpu().numpy()
 
-            filtered_boxes, filtered_confidences, filtered_classes = self.filter_detections(
-                detected_classes, detected_boxes, detected_confidences, target_classes
-            )
-
             # Generate unique names for each detected object
-            object_names = self.generate_object_names(filtered_classes)
+            object_names = self.generate_object_names(detected_classes)
 
             # Update GUI with detected objects
-            objects_count = {self.model.names[cls]: filtered_classes.count(cls) for cls in set(filtered_classes)}
+            objects_count = {self.model.names[int(cls)]: list(detected_classes).count(cls) for cls in
+                             set(detected_classes)}
             self.update_textbox(objects_count)
 
             # Calculate and update bounding box areas
-            bounding_box_areas = self.calculate_areas(filtered_boxes)
+            bounding_box_areas = self.calculate_areas(detected_boxes)
             self.update_area_textbox(bounding_box_areas, object_names)
 
             # Draw bounding boxes with unique names and line at the bottom
-            frame = self.draw_bounding_boxes(frame, filtered_boxes, filtered_classes, object_names)
+            frame = self.draw_bounding_boxes(frame, detected_boxes, detected_classes, object_names)
 
             # Convert frame to ImageTk format and update canvas
             self.update_canvas(frame)
@@ -154,24 +161,14 @@ class VideoApp:
         self.cap.release()
         cv2.destroyAllWindows()
 
-    def filter_detections(self, detected_classes, detected_boxes, detected_confidences, target_classes):
-        filtered_boxes = []
-        filtered_confidences = []
-        filtered_classes = []
-
-        for i, cls in enumerate(detected_classes):
-            if int(cls) in target_classes:
-                filtered_boxes.append(detected_boxes[i])
-                filtered_confidences.append(detected_confidences[i])
-                filtered_classes.append(int(cls))
-
-        return filtered_boxes, filtered_confidences, filtered_classes
-
-    def generate_object_names(self, filtered_classes):
-        name_count = {"person": 0, "car": 0, "sports ball": 0}
+    def generate_object_names(self, detected_classes):
+        # Dynamically create the name count dictionary based on model class names
+        name_count = {name: 0 for name in self.model.names}
         object_names = []
-        for cls in filtered_classes:
-            name = self.model.names[cls]
+        for cls in detected_classes:
+            name = self.model.names[int(cls)]
+            if name not in name_count:
+                name_count[name] = 0
             name_count[name] += 1
             object_names.append(f"{name}{name_count[name]}")
         return object_names
@@ -180,10 +177,13 @@ class VideoApp:
         messages = []
         for box, cls, name in zip(filtered_boxes, filtered_classes, object_names):
             x1, y1, x2, y2 = map(int, box)
+            class_name = self.model.names[int(cls)]
+            color = self.class_colors[class_name]
+
             # Draw bounding box
-            frame = cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            frame = cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
             # Draw object name
-            frame = cv2.putText(frame, name, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+            frame = cv2.putText(frame, name, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
             # Draw line at the bottom
             cv2.line(frame, (0, self.line_y), (frame.shape[1], self.line_y), self.line_color, 1)
             # Calculate distance from object to line
@@ -192,18 +192,19 @@ class VideoApp:
             # Display distance
             frame = cv2.putText(frame, f"{distance} px", bottom_center, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
-            # Determine message based on distance
+            # Determine message based on fixed distance
             if distance < 50:
                 messages.append(f"Stop immediately! {name} is too close!")
-                self.proximity_text_box.config(state=tk.DISABLED, fg="white", bg="red")
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), -1)
-            elif 70 <= distance < 100:
+                overlay = frame.copy()
+                cv2.rectangle(overlay, (x1, y1), (x2, y2), color, -1)
+                frame = cv2.addWeighted(overlay, 0.5, frame, 0.5, 0)
+            elif 50 <= distance < 100:
                 messages.append(f"Warning! Pay attention to {name}.")
                 self.proximity_text_box.config(state=tk.DISABLED, fg="orange", bg="#535353")
             elif 100 <= distance < 150:
                 messages.append(f"Getting close to {name}.")
                 self.proximity_text_box.config(state=tk.DISABLED, fg="yellow", bg="#535353")
-            elif distance < 250:
+            elif 150 <= distance < 250:
                 messages.append(f"Approaching {name}.")
                 self.proximity_text_box.config(state=tk.DISABLED, fg="lime", bg="#535353")
 
@@ -253,6 +254,7 @@ class VideoApp:
             area = (x2 - x1) * (y2 - y1)
             areas.append(area)
         return areas
+
 
 # Setup the main window
 if __name__ == "__main__":
