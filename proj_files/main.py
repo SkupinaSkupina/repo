@@ -1,9 +1,10 @@
 import tkinter as tk
 from tkinter import filedialog
-from threading import Thread
+from threading import Thread, Event
 import cv2
 from PIL import Image, ImageTk
 import torch
+import winsound
 
 class VideoApp:
     def __init__(self, root):
@@ -23,6 +24,10 @@ class VideoApp:
         self.select_button = tk.Button(root, text="Select Video", command=self.select_video_file,
                                        bg=button_color, fg=text_color, font=('Helvetica', 12, 'bold'))
         self.select_button.pack(pady=10)
+
+        self.webcam_button = tk.Button(root, text="Load Camera", command=self.load_webcam_stream,
+                                       bg=button_color, fg=text_color, font=('Helvetica', 12, 'bold'))
+        self.webcam_button.pack(pady=10)
 
         self.source_label = tk.Label(root, text="No video selected", bg=bg_color, fg=text_color)
         self.source_label.pack(pady=5)
@@ -75,6 +80,14 @@ class VideoApp:
             'car': (0, 0, 255)  # Red
         }
 
+        # Initialize beep control
+        self.beep_event = Event()
+        self.min_distance = float('inf')
+
+        # Start the beep thread
+        self.beep_thread = Thread(target=self.beep_control)
+        self.beep_thread.start()
+
     def create_text_box(self, parent, height, width, side=tk.LEFT):
         """Create and return a text box with given parameters."""
         text_box = tk.Text(parent, state=tk.DISABLED, height=height, width=width, bg="#535353", fg="#FFFFFF",
@@ -95,9 +108,13 @@ class VideoApp:
             self.source_label.config(text=file_path)
             self.run_detection(file_path)
 
-    def run_detection(self, source_file):
+    def load_webcam_stream(self):
+        self.source_label.config(text="Webcam Stream")
+        self.run_detection(0)  # 0 default webcam index
+
+    def run_detection(self, source):
         # Open video source
-        self.cap = cv2.VideoCapture(source_file)
+        self.cap = cv2.VideoCapture(source)
 
         # Check if the video is opened successfully
         if not self.cap.isOpened():
@@ -105,7 +122,10 @@ class VideoApp:
             return
 
         # Get the total number of frames in the video
-        self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if isinstance(source, str):  # Only get frame count for video files
+            self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        else:
+            self.total_frames = float('inf')  # For webcam, we don't have a known total frame count
 
         # Run detection in a separate thread to keep the GUI responsive
         Thread(target=self.process_frame).start()
@@ -150,7 +170,10 @@ class VideoApp:
             self.update_canvas(frame)
 
             # Update frame info label
-            self.frame_info_label.config(text=f"Frame: {passed_frames}/{self.total_frames}")
+            if self.total_frames != float('inf'):  # Only update frame info for video files
+                self.frame_info_label.config(text=f"Frame: {passed_frames}/{self.total_frames}")
+            else:
+                self.frame_info_label.config(text=f"Frame: {passed_frames}")
 
             # Sleep
             self.root.update_idletasks()
@@ -173,6 +196,7 @@ class VideoApp:
 
     def draw_bounding_boxes(self, frame, filtered_boxes, filtered_classes, object_names):
         messages = []
+        min_distance = float('inf')
         for box, cls, name in zip(filtered_boxes, filtered_classes, object_names):
             x1, y1, x2, y2 = map(int, box)
             class_name = self.model.names[int(cls)]
@@ -187,6 +211,7 @@ class VideoApp:
             # Calculate distance from object to line
             bottom_center = ((x1 + x2) // 2, y2)
             distance = abs(bottom_center[1] - self.line_y)
+            min_distance = min(min_distance, distance)
             # Display distance
             frame = cv2.putText(frame, f"{distance} px", bottom_center, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
@@ -208,6 +233,8 @@ class VideoApp:
                 self.proximity_text_box.config(state=tk.DISABLED, fg="lime", bg="#535353")
 
         self.update_proximity_textbox(messages)
+        self.min_distance = min_distance
+        self.beep_event.set()  # Trigger beep event
         return frame
 
     def update_proximity_textbox(self, messages):
@@ -254,6 +281,32 @@ class VideoApp:
             areas.append(area)
         return areas
 
+    def beep_control(self):
+        while True:
+            self.beep_event.wait()
+            self.beep_event.clear()
+            beep_interval = None
+            if self.min_distance < 50:
+                beep_interval = 0.1
+            elif self.min_distance < 75:
+                beep_interval = 0.4
+            elif self.min_distance < 100:
+                beep_interval = 0.75
+            elif self.min_distance < 125:
+                beep_interval = 1
+            elif self.min_distance < 150:
+                beep_interval = 1.5
+            elif self.min_distance < 175:
+                beep_interval = 2
+
+            if beep_interval:
+                print(f"Beeping with interval: {beep_interval} seconds")
+                while self.min_distance < 175:
+                    winsound.Beep(1000, int(beep_interval * 1000))  # 1000 Hz frequency, duration in ms
+                    self.beep_event.wait(timeout=beep_interval)
+                    print("Beep")
+
+# Setup the main window
 if __name__ == "__main__":
     root = tk.Tk()
     app = VideoApp(root)
