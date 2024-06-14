@@ -1,11 +1,11 @@
+import winsound
+from threading import Thread, Event, Lock
+import time
 import tkinter as tk
 from tkinter import filedialog
-from threading import Thread
 import cv2
 from PIL import Image, ImageTk
 import torch
-import numpy as np
-
 
 class VideoApp:
     def __init__(self, root):
@@ -25,6 +25,10 @@ class VideoApp:
         self.select_button = tk.Button(root, text="Select Video", command=self.select_video_file,
                                        bg=button_color, fg=text_color, font=('Helvetica', 12, 'bold'))
         self.select_button.pack(pady=10)
+
+        self.webcam_button = tk.Button(root, text="Load Camera", command=self.load_webcam_stream,
+                                       bg=button_color, fg=text_color, font=('Helvetica', 12, 'bold'))
+        self.webcam_button.pack(pady=10)
 
         self.source_label = tk.Label(root, text="No video selected", bg=bg_color, fg=text_color)
         self.source_label.pack(pady=5)
@@ -77,8 +81,20 @@ class VideoApp:
             'car': (0, 0, 255)  # Red
         }
 
+        # Initialize beep control
+        self.beep_event = Event()
+        self.beep_thread_lock = Lock()
+        self.beep_thread_active = False
+        self.current_beep_thread = None
+        self.constant_beep_thread = None
+        self.constant_beep_thread_active = False
+
+        # Start the beep thread
+        self.beep_thread = Thread(target=self.beep_control)
+        self.beep_thread.daemon = True
+        self.beep_thread.start()
+
     def create_text_box(self, parent, height, width, side=tk.LEFT):
-        """Create and return a text box with given parameters."""
         text_box = tk.Text(parent, state=tk.DISABLED, height=height, width=width, bg="#535353", fg="#FFFFFF",
                            wrap=tk.WORD)
         text_box.pack(side=side, padx=(0, 10))
@@ -97,9 +113,13 @@ class VideoApp:
             self.source_label.config(text=file_path)
             self.run_detection(file_path)
 
-    def run_detection(self, source_file):
+    def load_webcam_stream(self):
+        self.source_label.config(text="Webcam Stream")
+        self.run_detection(0)  # 0 default webcam index
+
+    def run_detection(self, source):
         # Open video source
-        self.cap = cv2.VideoCapture(source_file)
+        self.cap = cv2.VideoCapture(source)
 
         # Check if the video is opened successfully
         if not self.cap.isOpened():
@@ -107,7 +127,10 @@ class VideoApp:
             return
 
         # Get the total number of frames in the video
-        self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if isinstance(source, str):  # Only get frame count for video files
+            self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        else:
+            self.total_frames = float('inf')  # For webcam, we don't have a known total frame count
 
         # Run detection in a separate thread to keep the GUI responsive
         Thread(target=self.process_frame).start()
@@ -152,7 +175,10 @@ class VideoApp:
             self.update_canvas(frame)
 
             # Update frame info label
-            self.frame_info_label.config(text=f"Frame: {passed_frames}/{self.total_frames}")
+            if self.total_frames != float('inf'):  # Only update frame info for video files
+                self.frame_info_label.config(text=f"Frame: {passed_frames}/{self.total_frames}")
+            else:
+                self.frame_info_label.config(text=f"Frame: {passed_frames}")
 
             # Sleep
             self.root.update_idletasks()
@@ -175,6 +201,7 @@ class VideoApp:
 
     def draw_bounding_boxes(self, frame, filtered_boxes, filtered_classes, object_names):
         messages = []
+        min_distance = float('inf')
         for box, cls, name in zip(filtered_boxes, filtered_classes, object_names):
             x1, y1, x2, y2 = map(int, box)
             class_name = self.model.names[int(cls)]
@@ -189,6 +216,7 @@ class VideoApp:
             # Calculate distance from object to line
             bottom_center = ((x1 + x2) // 2, y2)
             distance = abs(bottom_center[1] - self.line_y)
+            min_distance = min(min_distance, distance)
             # Display distance
             frame = cv2.putText(frame, f"{distance} px", bottom_center, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
@@ -198,6 +226,7 @@ class VideoApp:
                 overlay = frame.copy()
                 cv2.rectangle(overlay, (x1, y1), (x2, y2), color, -1)
                 frame = cv2.addWeighted(overlay, 0.5, frame, 0.5, 0)
+                self.proximity_text_box.config(state=tk.DISABLED, fg="red", bg="#535353")
             elif 50 <= distance < 100:
                 messages.append(f"Warning! Pay attention to {name}.")
                 self.proximity_text_box.config(state=tk.DISABLED, fg="orange", bg="#535353")
@@ -209,6 +238,8 @@ class VideoApp:
                 self.proximity_text_box.config(state=tk.DISABLED, fg="lime", bg="#535353")
 
         self.update_proximity_textbox(messages)
+        self.min_distance = min_distance
+        self.beep_event.set()  # Trigger beep event
         return frame
 
     def update_proximity_textbox(self, messages):
@@ -255,6 +286,71 @@ class VideoApp:
             areas.append(area)
         return areas
 
+    def beep_control(self):
+        while True:
+            self.beep_event.wait()
+            self.beep_event.clear()
+            self.manage_beep_thread()
+
+    def manage_beep_thread(self):
+        with self.beep_thread_lock:
+            if self.min_distance < 50:
+                if not self.constant_beep_thread_active or self.constant_beep_thread is None:
+                    self.start_constant_beep_thread()
+            else:
+                if self.constant_beep_thread is not None:
+                    self.stop_constant_beep_thread()
+                beep_interval = self.calculate_beep_interval()
+                if beep_interval is not None:
+                    self.start_beep_thread(beep_interval)
+
+    def calculate_beep_interval(self):
+        if self.min_distance <= 50:
+            return 0
+        elif self.min_distance <= 75:
+            return 0.005
+        elif self.min_distance <= 100:
+            return 0.09
+        elif self.min_distance <= 125:
+            return 0.2
+        elif self.min_distance <= 150:
+            return 0.4
+        return None
+
+    def start_beep_thread(self, beep_interval):
+        self.stop_beep_thread()  # Ensure no other thread is running
+        self.beep_thread_active = True
+        self.current_beep_thread = Thread(target=self.beep_in_loop, args=(beep_interval,))
+        self.current_beep_thread.daemon = True
+        self.current_beep_thread.start()
+
+    def stop_beep_thread(self):
+        self.beep_thread_active = False
+        if self.current_beep_thread is not None:
+            self.current_beep_thread.join()
+            self.current_beep_thread = None
+
+    def beep_in_loop(self, interval):
+        while self.beep_thread_active and self.min_distance <= 150:
+            winsound.Beep(900, 200)  # 900 Hz frequency, 0.2s duration
+            time.sleep(interval)
+
+    def start_constant_beep_thread(self):
+        self.stop_beep_thread()  # Ensure no other thread is running
+        self.constant_beep_thread_active = True
+        self.constant_beep_thread = Thread(target=self.constant_beep)
+        self.constant_beep_thread.daemon = True
+        self.constant_beep_thread.start()
+
+    def stop_constant_beep_thread(self):
+        self.constant_beep_thread_active = False
+        if self.constant_beep_thread is not None:
+            self.constant_beep_thread.join()
+            self.constant_beep_thread = None
+
+    def constant_beep(self):
+        while self.constant_beep_thread_active and self.min_distance < 50:5
+            winsound.Beep(900, 1000)  # 900 Hz frequency, 1s duration
 
 # Setup the main window
 if __name__ == "__main__":
