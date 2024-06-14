@@ -349,7 +349,7 @@ class VideoApp:
             self.constant_beep_thread = None
 
     def constant_beep(self):
-        while self.constant_beep_thread_active and self.min_distance < 50:5
+        while self.constant_beep_thread_active and self.min_distance < 50:
             winsound.Beep(900, 1000)  # 900 Hz frequency, 1s duration
 
 # Setup the main window
