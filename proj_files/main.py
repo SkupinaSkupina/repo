@@ -331,6 +331,29 @@ class VideoApp:
             areas.append(area)
         return areas
 
+    # ------------------------- recording for incident reporter
+    def start_recording(self, frame):
+        self.recording = True
+        now = datetime.now().strftime("%Y%m%d_%H%M%S")
+        video_filename = f"incident_report/{now}_incident_video.mp4"
+        log_filename = f"incident_report/{now}_incident_log.txt"
+
+        # Create incident_report directory if it doesn't exist
+        if not os.path.exists("incident_report"):
+            os.makedirs("incident_report")
+
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        self.out = cv2.VideoWriter(video_filename, fourcc, 20.0, (frame.shape[1], frame.shape[0]))
+        self.log_file = open(log_filename, "w")
+
+    def stop_recording(self):
+        self.recording = False
+        self.out.release()
+        for data in self.log_data:
+            frame_number, object_count, min_distance = data
+            self.log_file.write(f"f:{frame_number}\n{object_count.strip()}\nMin_d: {min_distance}\n-----------------\n")
+        self.log_file.close()
+
     # ------------------------- beeping
     def beep_control(self):
         while True:
