@@ -47,6 +47,13 @@ class VideoApp:
         self.frame_info_label = tk.Label(root, text="Frame: 0/0", bg=bg_color, fg=text_color)
         self.frame_info_label.pack(pady=5)
 
+        # Checkbox for recording incidents
+        self.record_incident_var = tk.BooleanVar()
+        self.record_incident_checkbox = tk.Checkbutton(root, text="Record Incident", variable=self.record_incident_var,
+                                                       bg=bg_color, fg=text_color, selectcolor=accent_color,
+                                                       font=('Helvetica', 12, 'bold'))
+        self.record_incident_checkbox.pack(pady=10)
+
         # Main frame
         self.main_frame = tk.Frame(root, bg=bg_color, borderwidth=0, highlightthickness=0)
         self.main_frame.pack(fill=tk.BOTH, expand=True)
