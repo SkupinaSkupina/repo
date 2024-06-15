@@ -330,7 +330,42 @@ class VideoApp:
             areas.append(area)
         return areas
 
-    #
+    def update_prometheus_counters(self, objects_count):
+        for object_class, count in objects_count.items():
+            if object_class in self.object_counters:
+                increment = count - self.previous_counts[object_class]
+                if increment > 0:
+                    self.object_counters[object_class].inc(increment)
+                self.previous_counts[object_class] = count
+                print(f"{object_class} counter: {self.object_counters[object_class]._value.get()}")
+
+    def update_gauges(self, objects_count):
+        self.cars_detected_gauge.set(objects_count.get('car', 0))
+        self.persons_detected_gauge.set(objects_count.get('person', 0))
+        self.trees_detected_gauge.set(objects_count.get('tree', 0))
+        self.balls_detected_gauge.set(objects_count.get('ball', 0))
+
+    def send_incident_alert(self, object_name):
+        message = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - Incident occurred with {object_name}!"
+        self.producer.publish(self.topic, message, qos=1, retain=False)
+        self.counter_sending.inc()
+        self.bytes_sending.inc(len(message.encode('utf-8')))
+        self.incident_counter.inc()
+        print(f"MQTT Incident Alert Sent: {message}")
+        print(f"Incident counter: {self.incident_counter._value.get()}")
+
+    # Starts thread that monitors CPU and RAM useage
+    def start_monitoring(self):
+        def monitor():
+            while True:
+                # Update CPU and RAM usage as a percentage
+                process = psutil.Process()
+                self.cpu_usage_gauge.set(process.cpu_percent(interval=1))
+                self.ram_usage_gauge.set(process.memory_percent())  # RAM usage in percentage
+
+                time.sleep(1)
+
+        Thread(target=monitor, daemon=True).start()
 
     def beep_control(self):
         while True:
