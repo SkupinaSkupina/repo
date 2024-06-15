@@ -1,10 +1,14 @@
+import winsound
+from threading import Thread, Event, Lock
+import time
 import tkinter as tk
 from tkinter import filedialog
-from threading import Thread, Event
 import cv2
 from PIL import Image, ImageTk
 import torch
-import winsound
+import os
+from datetime import datetime
+
 
 class VideoApp:
     def __init__(self, root):
@@ -21,13 +25,16 @@ class VideoApp:
         self.root.config(bg=bg_color)
 
         # Create and place the widgets
-        self.select_button = tk.Button(root, text="Select Video", command=self.select_video_file,
-                                       bg=button_color, fg=text_color, font=('Helvetica', 12, 'bold'))
-        self.select_button.pack(pady=10)
+        button_frame = tk.Frame(root, bg=bg_color)
+        button_frame.pack(pady=10)
 
-        self.webcam_button = tk.Button(root, text="Load Camera", command=self.load_webcam_stream,
+        self.select_button = tk.Button(button_frame, text="Select Video", command=self.select_video_file,
                                        bg=button_color, fg=text_color, font=('Helvetica', 12, 'bold'))
-        self.webcam_button.pack(pady=10)
+        self.select_button.grid(row=0, column=0, padx=5)
+
+        self.webcam_button = tk.Button(button_frame, text="Load Camera", command=self.load_webcam_stream,
+                                       bg=button_color, fg=text_color, font=('Helvetica', 12, 'bold'))
+        self.webcam_button.grid(row=0, column=1, padx=5)
 
         self.source_label = tk.Label(root, text="No video selected", bg=bg_color, fg=text_color)
         self.source_label.pack(pady=5)
@@ -63,6 +70,7 @@ class VideoApp:
         self.initialize_textboxes()
 
         self.cap = None
+        self.stop_event = Event()
 
         # Load YOLOv5 model, using GPU if available
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -82,14 +90,18 @@ class VideoApp:
 
         # Initialize beep control
         self.beep_event = Event()
-        self.min_distance = float('inf')
+        self.beep_thread_lock = Lock()
+        self.beep_thread_active = False
+        self.current_beep_thread = None
+        self.constant_beep_thread = None
+        self.constant_beep_thread_active = False
 
         # Start the beep thread
         self.beep_thread = Thread(target=self.beep_control)
+        self.beep_thread.daemon = True
         self.beep_thread.start()
 
     def create_text_box(self, parent, height, width, side=tk.LEFT):
-        """Create and return a text box with given parameters."""
         text_box = tk.Text(parent, state=tk.DISABLED, height=height, width=width, bg="#535353", fg="#FFFFFF",
                            wrap=tk.WORD)
         text_box.pack(side=side, padx=(0, 10))
@@ -128,12 +140,21 @@ class VideoApp:
             self.total_frames = float('inf')  # For webcam, we don't have a known total frame count
 
         # Run detection in a separate thread to keep the GUI responsive
+        self.stop_event.clear()
         Thread(target=self.process_frame).start()
+
+    def stop_video(self):
+        # Stop the frame processing
+        self.stop_event.set()
+
+        # Save the recording if necessary
+        if self.recording:
+            self.stop_recording()
 
     def process_frame(self):
         passed_frames = 0
 
-        while self.cap.isOpened():
+        while self.cap.isOpened() and not self.stop_event.is_set():
             ret, frame = self.cap.read()
             if not ret:
                 break
@@ -175,12 +196,25 @@ class VideoApp:
             else:
                 self.frame_info_label.config(text=f"Frame: {passed_frames}")
 
+            # Check if recording is enabled and if an incident occurred
+            if self.record_incident_var.get() and self.min_distance < 50:
+                if not self.recording:
+                    self.start_recording(frame)
+                self.log_data.append((passed_frames, self.text_box.get("1.0", tk.END), self.min_distance))
+
+            if self.recording:
+                self.out.write(frame)
+
             # Sleep
             self.root.update_idletasks()
             self.root.update()
 
         self.cap.release()
         cv2.destroyAllWindows()
+
+        # Stop recording when video ends
+        if self.recording:
+            self.stop_recording()
 
     def generate_object_names(self, detected_classes):
         # Dynamically create the name count dictionary based on model class names
@@ -281,32 +315,74 @@ class VideoApp:
             areas.append(area)
         return areas
 
+    # ------------------------- beeping
     def beep_control(self):
         while True:
             self.beep_event.wait()
             self.beep_event.clear()
-            beep_interval = None
+            self.manage_beep_thread()
+
+    def manage_beep_thread(self):
+        with self.beep_thread_lock:
             if self.min_distance < 50:
-                beep_interval = 0.1
-            elif self.min_distance < 75:
-                beep_interval = 0.4
-            elif self.min_distance < 100:
-                beep_interval = 0.75
-            elif self.min_distance < 125:
-                beep_interval = 1
-            elif self.min_distance < 150:
-                beep_interval = 1.5
-            elif self.min_distance < 175:
-                beep_interval = 2
+                if not self.constant_beep_thread_active or self.constant_beep_thread is None:
+                    self.start_constant_beep_thread()
+            else:
+                if self.constant_beep_thread is not None:
+                    self.stop_constant_beep_thread()
+                beep_interval = self.calculate_beep_interval()
+                if beep_interval is not None:
+                    self.start_beep_thread(beep_interval)
 
-            if beep_interval:
-                print(f"Beeping with interval: {beep_interval} seconds")
-                while self.min_distance < 175:
-                    winsound.Beep(1000, int(beep_interval * 1000))  # 1000 Hz frequency, duration in ms
-                    self.beep_event.wait(timeout=beep_interval)
-                    print("Beep")
+    def calculate_beep_interval(self):
+        if self.min_distance <= 50:
+            return 0
+        elif self.min_distance <= 75:
+            return 0.005
+        elif self.min_distance <= 100:
+            return 0.09
+        elif self.min_distance <= 125:
+            return 0.2
+        elif self.min_distance <= 150:
+            return 0.4
+        return None
 
-# Setup the main window
+    def start_beep_thread(self, beep_interval):
+        self.stop_beep_thread()  # Ensure no other thread is running
+        self.beep_thread_active = True
+        self.current_beep_thread = Thread(target=self.beep_in_loop, args=(beep_interval,))
+        self.current_beep_thread.daemon = True
+        self.current_beep_thread.start()
+
+    def stop_beep_thread(self):
+        self.beep_thread_active = False
+        if self.current_beep_thread is not None:
+            self.current_beep_thread.join()
+            self.current_beep_thread = None
+
+    def beep_in_loop(self, interval):
+        while self.beep_thread_active and self.min_distance <= 150:
+            winsound.Beep(900, 200)  # 900 Hz frequency, 0.2s duration
+            time.sleep(interval)
+
+    def start_constant_beep_thread(self):
+        self.stop_beep_thread()  # Ensure no other thread is running
+        self.constant_beep_thread_active = True
+        self.constant_beep_thread = Thread(target=self.constant_beep)
+        self.constant_beep_thread.daemon = True
+        self.constant_beep_thread.start()
+
+    def stop_constant_beep_thread(self):
+        self.constant_beep_thread_active = False
+        if self.constant_beep_thread is not None:
+            self.constant_beep_thread.join()
+            self.constant_beep_thread = None
+
+    def constant_beep(self):
+        while self.constant_beep_thread_active and self.min_distance < 50:
+            winsound.Beep(900, 1000)  # 900 Hz frequency, 1s duration
+
+
 if __name__ == "__main__":
     root = tk.Tk()
     app = VideoApp(root)
