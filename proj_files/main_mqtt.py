@@ -5,6 +5,11 @@ import cv2
 from PIL import Image, ImageTk
 import torch
 import winsound
+import paho.mqtt.client as mqtt
+from datetime import datetime
+from prometheus_client import start_http_server, Counter, Gauge
+import psutil
+import time
 
 class VideoApp:
     def __init__(self, root):
@@ -74,10 +79,10 @@ class VideoApp:
 
         # Define colors for different classes
         self.class_colors = {
-            'person': (255, 0, 0),  # Blue
+            'person': (255, 0, 0),  # Red
             'ball': (0, 255, 255),  # Yellow
             'tree': (0, 255, 0),  # Green
-            'car': (0, 0, 255)  # Red
+            'car': (0, 0, 255)  # Blue
         }
 
         # Initialize beep control
@@ -87,6 +92,28 @@ class VideoApp:
         # Start the beep thread
         self.beep_thread = Thread(target=self.beep_control)
         self.beep_thread.start()
+
+        # Initialize MQTT
+        self.broker = "10.8.5.3"
+        self.port = 1883
+        self.topic = "/data"
+        self.producer = mqtt.Client(client_id="Alen", callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
+        self.producer.connect(self.broker, self.port, 60)
+        self.producer.loop_start()
+
+        # Define counters for detected object classes
+        self.object_counters = {
+            'person': Counter('person_detected_total', 'Total number of people detected'),
+            'ball': Counter('ball_detected_total', 'Total number of balls detected'),
+            'tree': Counter('tree_detected_total', 'Total number of trees detected'),
+            'car': Counter('car_detected_total', 'Total number of cars detected')
+        }
+
+        # Define counter for incidents
+        self.incident_counter = Counter('incident_total', 'Total number of incidents')
+
+        # Start Prometheus metrics server
+        start_http_server(8000)
 
     def create_text_box(self, parent, height, width, side=tk.LEFT):
         """Create and return a text box with given parameters."""
@@ -132,6 +159,7 @@ class VideoApp:
 
     def process_frame(self):
         passed_frames = 0
+        start_time = time.time()
 
         while self.cap.isOpened():
             ret, frame = self.cap.read()
@@ -155,8 +183,7 @@ class VideoApp:
             object_names = self.generate_object_names(detected_classes)
 
             # Update GUI with detected objects
-            objects_count = {self.model.names[int(cls)]: list(detected_classes).count(cls) for cls in
-                             set(detected_classes)}
+            objects_count = {self.model.names[int(cls)]: list(detected_classes).count(cls) for cls in set(detected_classes)}
             self.update_textbox(objects_count)
 
             # Calculate and update bounding box areas
@@ -281,6 +308,8 @@ class VideoApp:
             areas.append(area)
         return areas
 
+    #
+
     def beep_control(self):
         while True:
             self.beep_event.wait()
@@ -304,7 +333,7 @@ class VideoApp:
                 while self.min_distance < 175:
                     winsound.Beep(1000, int(beep_interval * 1000))  # 1000 Hz frequency, duration in ms
                     self.beep_event.wait(timeout=beep_interval)
-                    print("Beep")
+                    #print("Beep")
 
 # Setup the main window
 if __name__ == "__main__":

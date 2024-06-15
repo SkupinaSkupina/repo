@@ -15,8 +15,8 @@ def change_frame_rate(input_video_path, output_video_path, target_fps=15):
 
 
 # Example usage
-input_video_path = "data/video/video011-2.mp4"  # Path to your input video
-output_video_path = "data/video/15_video011-2.mp4.mp4"  # Path to save the output video
+input_video_path = "data/video/testni-posnetek.mp4"  # Path to your input video
+output_video_path = "data/video/15_testni-posnetek.mp4"  # Path to save the output video
 
 # Change the frame rate of the video to 24 fps
 change_frame_rate(input_video_path, output_video_path)
