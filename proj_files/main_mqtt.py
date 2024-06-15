@@ -101,6 +101,17 @@ class VideoApp:
         self.producer.connect(self.broker, self.port, 60)
         self.producer.loop_start()
 
+        # Prometheus metrics
+        self.counter_sending = Counter('sending_counter', 'Number of messages sent')
+        self.bytes_sending = Counter('bytes_sending_counter', 'Number of bytes sent')
+        self.cpu_usage_gauge = Gauge('cpu_usage', 'CPU usage of the application')
+        self.ram_usage_gauge = Gauge('ram_usage', 'RAM usage of the application')
+        self.fps_gauge = Gauge('fps', 'Frames per second')
+        self.cars_detected_gauge = Gauge('cars_detected', 'Number of cars detected in the current frame')
+        self.persons_detected_gauge = Gauge('persons_detected', 'Number of persons detected in the current frame')
+        self.trees_detected_gauge = Gauge('trees_detected', 'Number of trees detected in the current frame')
+        self.balls_detected_gauge = Gauge('balls_detected', 'Number of balls detected in the current frame')
+
         # Define counters for detected object classes
         self.object_counters = {
             'person': Counter('person_detected_total', 'Total number of people detected'),
@@ -112,8 +123,19 @@ class VideoApp:
         # Define counter for incidents
         self.incident_counter = Counter('incident_total', 'Total number of incidents')
 
+        # Previous counts to track changes
+        self.previous_counts = {
+            'person': 0,
+            'ball': 0,
+            'tree': 0,
+            'car': 0
+        }
+
         # Start Prometheus metrics server
         start_http_server(8000)
+
+        # Start monitoring thread
+        self.start_monitoring()
 
     def create_text_box(self, parent, height, width, side=tk.LEFT):
         """Create and return a text box with given parameters."""
