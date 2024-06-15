@@ -208,6 +208,12 @@ class VideoApp:
             objects_count = {self.model.names[int(cls)]: list(detected_classes).count(cls) for cls in set(detected_classes)}
             self.update_textbox(objects_count)
 
+            # Update Prometheus counters
+            self.update_prometheus_counters(objects_count)
+
+            # Update the gauges with the number of detected objects
+            self.update_gauges(objects_count)
+
             # Calculate and update bounding box areas
             bounding_box_areas = self.calculate_areas(detected_boxes)
             self.update_area_textbox(bounding_box_areas, object_names)
@@ -223,6 +229,11 @@ class VideoApp:
                 self.frame_info_label.config(text=f"Frame: {passed_frames}/{self.total_frames}")
             else:
                 self.frame_info_label.config(text=f"Frame: {passed_frames}")
+
+            # Calculate and update FPS
+            elapsed_time = time.time() - start_time
+            fps = passed_frames / elapsed_time if elapsed_time > 0 else 0
+            self.fps_gauge.set(fps)
 
             # Sleep
             self.root.update_idletasks()
@@ -271,6 +282,7 @@ class VideoApp:
                 cv2.rectangle(overlay, (x1, y1), (x2, y2), color, -1)
                 frame = cv2.addWeighted(overlay, 0.5, frame, 0.5, 0)
                 self.proximity_text_box.config(state=tk.DISABLED, fg="red", bg="#535353")
+                self.send_incident_alert(name)  # Send MQTT alert and update incident counter
             elif 50 <= distance < 100:
                 messages.append(f"Warning! Pay attention to {name}.")
                 self.proximity_text_box.config(state=tk.DISABLED, fg="orange", bg="#535353")
@@ -354,7 +366,7 @@ class VideoApp:
         print(f"MQTT Incident Alert Sent: {message}")
         print(f"Incident counter: {self.incident_counter._value.get()}")
 
-    # Starts thread that monitors CPU and RAM useage
+    # Starts a thread to monitor CPU, RAM usage, and FPS.
     def start_monitoring(self):
         def monitor():
             while True:
