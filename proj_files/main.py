@@ -36,6 +36,10 @@ class VideoApp:
                                        bg=button_color, fg=text_color, font=('Helvetica', 12, 'bold'))
         self.webcam_button.grid(row=0, column=1, padx=5)
 
+        self.stop_button = tk.Button(button_frame, text="Stop", command=self.stop_video,
+                                     bg="red", fg=text_color, font=('Helvetica', 12, 'bold'))
+        self.stop_button.grid(row=0, column=2, padx=5)
+
         self.source_label = tk.Label(root, text="No video selected", bg=bg_color, fg=text_color)
         self.source_label.pack(pady=5)
 
@@ -95,6 +99,11 @@ class VideoApp:
         self.current_beep_thread = None
         self.constant_beep_thread = None
         self.constant_beep_thread_active = False
+
+        # Initialize recording control
+        self.recording = False
+        self.out = None
+        self.log_data = []
 
         # Start the beep thread
         self.beep_thread = Thread(target=self.beep_control)
