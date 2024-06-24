@@ -6,6 +6,9 @@ from tkinter import filedialog
 import cv2
 from PIL import Image, ImageTk
 import torch
+import os
+from datetime import datetime
+
 
 class VideoApp:
     def __init__(self, root):
@@ -22,13 +25,20 @@ class VideoApp:
         self.root.config(bg=bg_color)
 
         # Create and place the widgets
-        self.select_button = tk.Button(root, text="Select Video", command=self.select_video_file,
-                                       bg=button_color, fg=text_color, font=('Helvetica', 12, 'bold'))
-        self.select_button.pack(pady=10)
+        button_frame = tk.Frame(root, bg=bg_color)
+        button_frame.pack(pady=10)
 
-        self.webcam_button = tk.Button(root, text="Load Camera", command=self.load_webcam_stream,
+        self.select_button = tk.Button(button_frame, text="Select Video", command=self.select_video_file,
                                        bg=button_color, fg=text_color, font=('Helvetica', 12, 'bold'))
-        self.webcam_button.pack(pady=10)
+        self.select_button.grid(row=0, column=0, padx=5)
+
+        self.webcam_button = tk.Button(button_frame, text="Load Camera", command=self.load_webcam_stream,
+                                       bg=button_color, fg=text_color, font=('Helvetica', 12, 'bold'))
+        self.webcam_button.grid(row=0, column=1, padx=5)
+
+        self.stop_button = tk.Button(button_frame, text="Stop", command=self.stop_video,
+                                     bg="red", fg=text_color, font=('Helvetica', 12, 'bold'))
+        self.stop_button.grid(row=0, column=2, padx=5)
 
         self.source_label = tk.Label(root, text="No video selected", bg=bg_color, fg=text_color)
         self.source_label.pack(pady=5)
@@ -36,6 +46,13 @@ class VideoApp:
         # Frame information
         self.frame_info_label = tk.Label(root, text="Frame: 0/0", bg=bg_color, fg=text_color)
         self.frame_info_label.pack(pady=5)
+
+        # Checkbox for recording incidents
+        self.record_incident_var = tk.BooleanVar()
+        self.record_incident_checkbox = tk.Checkbutton(root, text="Record Incident", variable=self.record_incident_var,
+                                                       bg=bg_color, fg=text_color, selectcolor=accent_color,
+                                                       font=('Helvetica', 12, 'bold'))
+        self.record_incident_checkbox.pack(pady=10)
 
         # Main frame
         self.main_frame = tk.Frame(root, bg=bg_color, borderwidth=0, highlightthickness=0)
@@ -64,6 +81,7 @@ class VideoApp:
         self.initialize_textboxes()
 
         self.cap = None
+        self.stop_event = Event()
 
         # Load YOLOv5 model, using GPU if available
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -88,6 +106,11 @@ class VideoApp:
         self.current_beep_thread = None
         self.constant_beep_thread = None
         self.constant_beep_thread_active = False
+
+        # Initialize recording control
+        self.recording = False
+        self.out = None
+        self.log_data = []
 
         # Start the beep thread
         self.beep_thread = Thread(target=self.beep_control)
@@ -133,12 +156,21 @@ class VideoApp:
             self.total_frames = float('inf')  # For webcam, we don't have a known total frame count
 
         # Run detection in a separate thread to keep the GUI responsive
+        self.stop_event.clear()
         Thread(target=self.process_frame).start()
+
+    def stop_video(self):
+        # Stop the frame processing
+        self.stop_event.set()
+
+        # Save the recording if necessary
+        if self.recording:
+            self.stop_recording()
 
     def process_frame(self):
         passed_frames = 0
 
-        while self.cap.isOpened():
+        while self.cap.isOpened() and not self.stop_event.is_set():
             ret, frame = self.cap.read()
             if not ret:
                 break
@@ -180,12 +212,25 @@ class VideoApp:
             else:
                 self.frame_info_label.config(text=f"Frame: {passed_frames}")
 
+            # Check if recording is enabled and if an incident occurred
+            if self.record_incident_var.get() and self.min_distance < 50:
+                if not self.recording:
+                    self.start_recording(frame)
+                self.log_data.append((passed_frames, self.text_box.get("1.0", tk.END), self.min_distance))
+
+            if self.recording:
+                self.out.write(frame)
+
             # Sleep
             self.root.update_idletasks()
             self.root.update()
 
         self.cap.release()
         cv2.destroyAllWindows()
+
+        # Stop recording when video ends
+        if self.recording:
+            self.stop_recording()
 
     def generate_object_names(self, detected_classes):
         # Dynamically create the name count dictionary based on model class names
@@ -278,7 +323,6 @@ class VideoApp:
             self.area_text_box.insert(tk.END, f"{name} Area: {area:.2f} px\n")
         self.area_text_box.config(state=tk.DISABLED)
 
-    # ------------------------- beeping
     def calculate_areas(self, boxes):
         areas = []
         for box in boxes:
@@ -287,6 +331,29 @@ class VideoApp:
             areas.append(area)
         return areas
 
+    def start_recording(self, frame):
+        self.recording = True
+        now = datetime.now().strftime("%Y%m%d_%H%M%S")
+        video_filename = f"incident_report/{now}_incident_video.mp4"
+        log_filename = f"incident_report/{now}_incident_log.txt"
+
+        # Create incident_report directory if it doesn't exist
+        if not os.path.exists("incident_report"):
+            os.makedirs("incident_report")
+
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        self.out = cv2.VideoWriter(video_filename, fourcc, 20.0, (frame.shape[1], frame.shape[0]))
+        self.log_file = open(log_filename, "w")
+
+    def stop_recording(self):
+        self.recording = False
+        self.out.release()
+        for data in self.log_data:
+            frame_number, object_count, min_distance = data
+            self.log_file.write(f"f:{frame_number}\n{object_count.strip()}\nMin_d: {min_distance}\n---------------------------\n")
+        self.log_file.close()
+
+    # ------------------------- beeping
     def beep_control(self):
         while True:
             self.beep_event.wait()
@@ -352,6 +419,7 @@ class VideoApp:
     def constant_beep(self):
         while self.constant_beep_thread_active and self.min_distance < 50:
             winsound.Beep(900, 1000)  # 900 Hz frequency, 1s duration
+
 
 if __name__ == "__main__":
     root = tk.Tk()
