@@ -1,0 +1,423 @@
+Frame	Object Count	Min Distance
+21	ball: 1
+person: 1
+tree: 5	4
+22	ball: 1
+person: 1
+tree: 5	0
+23	ball: 1
+person: 1
+tree: 5	0
+24	ball: 1
+person: 1
+tree: 4	3
+25	ball: 1
+car: 1
+person: 1
+tree: 4	18
+26	car: 1
+person: 1
+tree: 4	26
+27	ball: 1
+car: 1
+person: 1
+tree: 5	21
+28	car: 1
+person: 1
+tree: 4	1
+29	car: 1
+person: 1
+tree: 4	0
+30	car: 1
+person: 1
+tree: 4	0
+31	car: 1
+person: 1
+tree: 4	6
+32	car: 1
+person: 1
+tree: 5	1
+33	car: 1
+person: 1
+tree: 4	7
+34	ball: 1
+car: 1
+person: 1
+tree: 3	0
+35	ball: 1
+car: 1
+person: 1
+tree: 3	0
+36	ball: 1
+person: 1
+tree: 4	2
+37	ball: 1
+person: 1
+tree: 3	4
+38	ball: 1
+person: 1
+tree: 3	3
+39	ball: 1
+person: 1
+tree: 3	1
+40	ball: 1
+person: 1
+tree: 3	11
+41	ball: 1
+person: 1
+tree: 3	20
+42	ball: 1
+person: 1
+tree: 3	12
+43	ball: 1
+person: 1
+tree: 3	18
+44	ball: 1
+person: 1
+tree: 3	19
+45	ball: 1
+person: 1
+tree: 3	14
+46	ball: 1
+person: 1
+tree: 3	3
+47	ball: 1
+person: 1
+tree: 3	7
+48	ball: 1
+person: 1
+tree: 3	14
+49	person: 1
+tree: 3	11
+50	ball: 1
+person: 1
+tree: 3	1
+51	ball: 1
+person: 1
+tree: 3	1
+52	ball: 1
+person: 1
+tree: 4	0
+53	ball: 1
+person: 1
+tree: 4	0
+54	ball: 1
+person: 1
+tree: 4	0
+55	ball: 1
+person: 1
+tree: 4	0
+56	ball: 1
+person: 1
+tree: 4	0
+57	ball: 1
+person: 1
+tree: 3	4
+58	ball: 1
+person: 1
+tree: 3	2
+59	ball: 1
+person: 1
+tree: 4	2
+60	ball: 1
+person: 1
+tree: 4	9
+61	ball: 1
+person: 1
+tree: 4	10
+62	ball: 1
+person: 1
+tree: 4	9
+63	ball: 1
+person: 1
+tree: 4	11
+64	ball: 1
+person: 1
+tree: 4	2
+65	ball: 1
+person: 1
+tree: 4	4
+66	ball: 1
+person: 1
+tree: 4	7
+67	ball: 1
+person: 1
+tree: 4	4
+68	ball: 1
+person: 1
+tree: 4	1
+69	ball: 1
+person: 1
+tree: 4	3
+70	ball: 1
+person: 1
+tree: 4	1
+71	ball: 1
+person: 1
+tree: 4	0
+72	ball: 1
+person: 1
+tree: 4	0
+73	ball: 1
+person: 1
+tree: 4	4
+74	ball: 1
+person: 1
+tree: 4	8
+75	ball: 1
+person: 1
+tree: 4	10
+76	ball: 1
+person: 1
+tree: 4	13
+77	ball: 1
+person: 1
+tree: 4	14
+78	ball: 1
+person: 1
+tree: 4	14
+79	ball: 1
+person: 1
+tree: 4	14
+80	ball: 1
+person: 1
+tree: 4	12
+81	ball: 1
+person: 1
+tree: 4	14
+82	ball: 1
+person: 1
+tree: 4	17
+83	ball: 1
+person: 1
+tree: 4	17
+84	ball: 1
+person: 1
+tree: 4	19
+85	ball: 1
+person: 1
+tree: 4	19
+86	ball: 1
+person: 1
+tree: 4	19
+87	ball: 1
+person: 1
+tree: 4	18
+88	ball: 1
+person: 1
+tree: 4	16
+89	ball: 1
+person: 1
+tree: 4	18
+90	ball: 1
+person: 1
+tree: 4	20
+91	person: 1
+tree: 4	15
+92	ball: 1
+person: 1
+tree: 5	19
+93	ball: 2
+person: 1
+tree: 4	21
+94	ball: 1
+person: 1
+tree: 4	16
+95	person: 1
+tree: 3	14
+96	ball: 1
+person: 1
+tree: 3	18
+97	ball: 1
+person: 1
+tree: 2	14
+98	person: 1
+tree: 3	5
+99	person: 1
+tree: 3	10
+100	person: 1
+tree: 3	16
+101	person: 1
+tree: 3	13
+102	person: 1
+tree: 3	20
+103	person: 1
+tree: 3	19
+104	person: 1
+tree: 3	20
+105	person: 1
+tree: 3	18
+106	person: 1
+tree: 3	14
+107	person: 1
+tree: 3	14
+108	person: 1
+tree: 3	14
+109	person: 1
+tree: 3	13
+110	person: 1
+tree: 3	13
+111	ball: 1
+person: 1
+tree: 3	11
+112	person: 1
+tree: 4	13
+113	ball: 1
+person: 1
+tree: 4	15
+114	ball: 1
+person: 1
+tree: 3	16
+115	ball: 1
+person: 1
+tree: 3	16
+116	ball: 2
+person: 1
+tree: 3	15
+117	ball: 1
+person: 1
+tree: 4	13
+118	ball: 1
+person: 1
+tree: 5	12
+119	ball: 1
+person: 1
+tree: 4	13
+120	ball: 1
+person: 1
+tree: 4	7
+121	ball: 2
+person: 1
+tree: 4	27
+122	person: 1
+tree: 4	26
+123	person: 1
+tree: 4	15
+124	ball: 1
+person: 1
+tree: 4	23
+125	ball: 1
+person: 1
+tree: 4	16
+126	ball: 1
+person: 1
+tree: 4	32
+127	ball: 1
+person: 1
+tree: 4	33
+128	ball: 1
+person: 1
+tree: 4	34
+129	ball: 1
+person: 1
+tree: 4	35
+228	ball: 1
+person: 1
+tree: 4	48
+229	ball: 1
+person: 1
+tree: 4	7
+230	ball: 1
+person: 1
+tree: 4	11
+231	ball: 1
+person: 1
+tree: 5	19
+232	ball: 1
+person: 1
+tree: 5	22
+233	ball: 1
+person: 1
+tree: 5	21
+234	ball: 1
+person: 1
+tree: 4	18
+235	ball: 1
+person: 1
+tree: 4	1
+236	ball: 1
+person: 1
+tree: 4	0
+237	ball: 1
+person: 1
+tree: 4	1
+238	ball: 1
+person: 1
+tree: 4	2
+239	ball: 1
+person: 1
+tree: 5	0
+240	ball: 1
+person: 1
+tree: 5	0
+241	ball: 1
+person: 1
+tree: 5	0
+242	ball: 1
+person: 1
+tree: 5	0
+243	ball: 1
+person: 1
+tree: 5	0
+283	person: 1
+tree: 6	26
+284	person: 1
+tree: 6	28
+285	person: 1
+tree: 6	26
+286	person: 1
+tree: 6	17
+287	person: 1
+tree: 7	19
+288	person: 1
+tree: 6	14
+289	person: 1
+tree: 5	10
+290	person: 1
+tree: 5	12
+291	person: 1
+tree: 5	14
+292	person: 1
+tree: 4	0
+293	person: 1
+tree: 5	0
+294	person: 1
+tree: 5	0
+295	person: 1
+tree: 6	0
+296	person: 1
+tree: 6	0
+297	person: 1
+tree: 5	0
+298	person: 1
+tree: 5	2
+299	person: 1
+tree: 5	0
+300	person: 1
+tree: 5	0
+301	person: 1
+tree: 5	0
+302	person: 1
+tree: 5	0
+303	person: 1
+tree: 5	0
+304	person: 1
+tree: 5	0
+305	person: 1
+tree: 5	0
+306	person: 1
+tree: 5	0
+307	person: 1
+tree: 5	0
+308	person: 1
+tree: 5	0
+309	person: 1
+tree: 5	0
+310	car: 1
+person: 1
+tree: 5	0
+311	car: 1
+tree: 5	1
+312	car: 1
+person: 1
+tree: 5	6
