@@ -366,8 +366,8 @@ class VideoApp:
         print(f"MQTT Incident Alert Sent: {message}")
         print(f"Incident counter: {self.incident_counter._value.get()}")
 
+    # Starts a thread to monitor CPU, RAM usage, and FPS.
     def start_monitoring(self):
-        """Starts a thread to monitor CPU, RAM usage, and FPS."""
         def monitor():
             while True:
                 # Update CPU and RAM usage as a percentage
