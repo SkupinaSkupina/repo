@@ -37,3 +37,4 @@ oz.
   Nato lahko zazenes main.py  
     cmd: `py main.py`
     lahko zaženeš tudi preko IDE
+    
