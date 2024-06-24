@@ -1,6 +1,3 @@
-import winsound
-from threading import Thread, Event, Lock
-import time
 import tkinter as tk
 from tkinter import filedialog
 import cv2
@@ -117,6 +114,7 @@ class VideoApp:
         self.beep_thread.start()
 
     def create_text_box(self, parent, height, width, side=tk.LEFT):
+        """Create and return a text box with given parameters."""
         text_box = tk.Text(parent, state=tk.DISABLED, height=height, width=width, bg="#535353", fg="#FFFFFF",
                            wrap=tk.WORD)
         text_box.pack(side=side, padx=(0, 10))
@@ -271,6 +269,7 @@ class VideoApp:
                 cv2.rectangle(overlay, (x1, y1), (x2, y2), color, -1)
                 frame = cv2.addWeighted(overlay, 0.5, frame, 0.5, 0)
                 self.proximity_text_box.config(state=tk.DISABLED, fg="red", bg="#535353")
+                self.send_incident_alert(name)  # Send MQTT alert and update incident counter
             elif 50 <= distance < 100:
                 messages.append(f"Warning! Pay attention to {name}.")
                 self.proximity_text_box.config(state=tk.DISABLED, fg="orange", bg="#535353")
