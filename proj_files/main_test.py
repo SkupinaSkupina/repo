@@ -3,16 +3,12 @@ from threading import Thread, Event, Lock
 import time
 import tkinter as tk
 from tkinter import filedialog
-from threading import Thread, Event
 import cv2
 from PIL import Image, ImageTk
 import torch
-import winsound
-import paho.mqtt.client as mqtt
+import os
 from datetime import datetime
-from prometheus_client import start_http_server, Counter, Gauge
-import psutil
-import time
+
 
 class VideoApp:
     def __init__(self, root):
@@ -29,13 +25,20 @@ class VideoApp:
         self.root.config(bg=bg_color)
 
         # Create and place the widgets
-        self.select_button = tk.Button(root, text="Select Video", command=self.select_video_file,
-                                       bg=button_color, fg=text_color, font=('Helvetica', 12, 'bold'))
-        self.select_button.pack(pady=10)
+        button_frame = tk.Frame(root, bg=bg_color)
+        button_frame.pack(pady=10)
 
-        self.webcam_button = tk.Button(root, text="Load Camera", command=self.load_webcam_stream,
+        self.select_button = tk.Button(button_frame, text="Select Video", command=self.select_video_file,
                                        bg=button_color, fg=text_color, font=('Helvetica', 12, 'bold'))
-        self.webcam_button.pack(pady=10)
+        self.select_button.grid(row=0, column=0, padx=5)
+
+        self.webcam_button = tk.Button(button_frame, text="Load Camera", command=self.load_webcam_stream,
+                                       bg=button_color, fg=text_color, font=('Helvetica', 12, 'bold'))
+        self.webcam_button.grid(row=0, column=1, padx=5)
+
+        self.stop_button = tk.Button(button_frame, text="Stop", command=self.stop_video,
+                                     bg="red", fg=text_color, font=('Helvetica', 12, 'bold'))
+        self.stop_button.grid(row=0, column=2, padx=5)
 
         self.source_label = tk.Label(root, text="No video selected", bg=bg_color, fg=text_color)
         self.source_label.pack(pady=5)
@@ -43,6 +46,13 @@ class VideoApp:
         # Frame information
         self.frame_info_label = tk.Label(root, text="Frame: 0/0", bg=bg_color, fg=text_color)
         self.frame_info_label.pack(pady=5)
+
+        # Checkbox for recording incidents
+        self.record_incident_var = tk.BooleanVar()
+        self.record_incident_checkbox = tk.Checkbutton(root, text="Record Incident", variable=self.record_incident_var,
+                                                       bg=bg_color, fg=text_color, selectcolor=accent_color,
+                                                       font=('Helvetica', 12, 'bold'))
+        self.record_incident_checkbox.pack(pady=10)
 
         # Main frame
         self.main_frame = tk.Frame(root, bg=bg_color, borderwidth=0, highlightthickness=0)
@@ -71,6 +81,7 @@ class VideoApp:
         self.initialize_textboxes()
 
         self.cap = None
+        self.stop_event = Event()
 
         # Load YOLOv5 model, using GPU if available
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -82,57 +93,29 @@ class VideoApp:
 
         # Define colors for different classes
         self.class_colors = {
-            'person': (255, 0, 0),  # Red
+            'person': (255, 0, 0),  # Blue
             'ball': (0, 255, 255),  # Yellow
             'tree': (0, 255, 0),  # Green
-            'car': (0, 0, 255)  # Blue
+            'car': (0, 0, 255)  # Red
         }
 
         # Initialize beep control
         self.beep_event = Event()
-        self.min_distance = float('inf')
+        self.beep_thread_lock = Lock()
+        self.beep_thread_active = False
+        self.current_beep_thread = None
+        self.constant_beep_thread = None
+        self.constant_beep_thread_active = False
+
+        # Initialize recording control
+        self.recording = False
+        self.out = None
+        self.log_data = []
 
         # Start the beep thread
         self.beep_thread = Thread(target=self.beep_control)
+        self.beep_thread.daemon = True
         self.beep_thread.start()
-
-        # Initialize MQTT
-        self.broker = "10.8.5.3"
-        self.port = 1883
-        self.topic = "/data"
-        self.producer = mqtt.Client(client_id="Alen", callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
-        self.producer.connect(self.broker, self.port, 60)
-        self.producer.loop_start()
-
-        # Prometheus metrics
-        self.counter_sending = Counter('sending_counter', 'Number of messages sent')
-        self.bytes_sending = Counter('bytes_sending_counter', 'Number of bytes sent')
-        self.cpu_usage_gauge = Gauge('cpu_usage', 'CPU usage of the application')
-        self.ram_usage_gauge = Gauge('ram_usage', 'RAM usage of the application')
-        self.fps_gauge = Gauge('fps', 'Frames per second')
-        self.cars_detected_gauge = Gauge('cars_detected', 'Number of cars detected in the current frame')
-        self.persons_detected_gauge = Gauge('persons_detected', 'Number of persons detected in the current frame')
-        self.trees_detected_gauge = Gauge('trees_detected', 'Number of trees detected in the current frame')
-        self.balls_detected_gauge = Gauge('balls_detected', 'Number of balls detected in the current frame')
-
-        # Define counters for detected object classes
-        self.object_counters = {
-            'person': Counter('person_detected_total', 'Total number of people detected'),
-            'ball': Counter('ball_detected_total', 'Total number of balls detected'),
-            'tree': Counter('tree_detected_total', 'Total number of trees detected'),
-            'car': Counter('car_detected_total', 'Total number of cars detected')
-        }
-
-        # Define counter for incidents
-        self.incident_counter = Counter('incident_total', 'Total number of incidents')
-
-        # Previous counts to track changes
-        self.previous_counts = {
-            'person': 0,
-            'ball': 0,
-            'tree': 0,
-            'car': 0
-        }
 
     def create_text_box(self, parent, height, width, side=tk.LEFT):
         text_box = tk.Text(parent, state=tk.DISABLED, height=height, width=width, bg="#535353", fg="#FFFFFF",
@@ -173,13 +156,21 @@ class VideoApp:
             self.total_frames = float('inf')  # For webcam, we don't have a known total frame count
 
         # Run detection in a separate thread to keep the GUI responsive
+        self.stop_event.clear()
         Thread(target=self.process_frame).start()
+
+    def stop_video(self):
+        # Stop the frame processing
+        self.stop_event.set()
+
+        # Save the recording if necessary
+        if self.recording:
+            self.stop_recording()
 
     def process_frame(self):
         passed_frames = 0
-        start_time = time.time()
 
-        while self.cap.isOpened():
+        while self.cap.isOpened() and not self.stop_event.is_set():
             ret, frame = self.cap.read()
             if not ret:
                 break
@@ -201,14 +192,9 @@ class VideoApp:
             object_names = self.generate_object_names(detected_classes)
 
             # Update GUI with detected objects
-            objects_count = {self.model.names[int(cls)]: list(detected_classes).count(cls) for cls in set(detected_classes)}
+            objects_count = {self.model.names[int(cls)]: list(detected_classes).count(cls) for cls in
+                             set(detected_classes)}
             self.update_textbox(objects_count)
-
-            # Update Prometheus counters
-            self.update_prometheus_counters(objects_count)
-
-            # Update the gauges with the number of detected objects
-            self.update_gauges(objects_count)
 
             # Calculate and update bounding box areas
             bounding_box_areas = self.calculate_areas(detected_boxes)
@@ -226,12 +212,25 @@ class VideoApp:
             else:
                 self.frame_info_label.config(text=f"Frame: {passed_frames}")
 
+            # Check if recording is enabled and if an incident occurred
+            if self.record_incident_var.get() and self.min_distance < 50:
+                if not self.recording:
+                    self.start_recording(frame)
+                self.log_data.append((passed_frames, self.text_box.get("1.0", tk.END), self.min_distance))
+
+            if self.recording:
+                self.out.write(frame)
+
             # Sleep
             self.root.update_idletasks()
             self.root.update()
 
         self.cap.release()
         cv2.destroyAllWindows()
+
+        # Stop recording when video ends
+        if self.recording:
+            self.stop_recording()
 
     def generate_object_names(self, detected_classes):
         # Dynamically create the name count dictionary based on model class names
@@ -324,7 +323,6 @@ class VideoApp:
             self.area_text_box.insert(tk.END, f"{name} Area: {area:.2f} px\n")
         self.area_text_box.config(state=tk.DISABLED)
 
-    # ------------------------- beeping
     def calculate_areas(self, boxes):
         areas = []
         for box in boxes:
@@ -332,10 +330,96 @@ class VideoApp:
             area = (x2 - x1) * (y2 - y1)
             areas.append(area)
         return areas
+
+    def start_recording(self, frame):
+        self.recording = True
+        now = datetime.now().strftime("%Y%m%d_%H%M%S")
+        video_filename = f"incident_report/{now}_incident_video.mp4"
+        log_filename = f"incident_report/{now}_incident_log.txt"
+
+        # Create incident_report directory if it doesn't exist
+        if not os.path.exists("incident_report"):
+            os.makedirs("incident_report")
+
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        self.out = cv2.VideoWriter(video_filename, fourcc, 20.0, (frame.shape[1], frame.shape[0]))
+        self.log_file = open(log_filename, "w")
+
+    def stop_recording(self):
+        self.recording = False
+        self.out.release()
+        for data in self.log_data:
+            frame_number, object_count, min_distance = data
+            self.log_file.write(f"f:{frame_number}\n{object_count.strip()}\nMin_d: {min_distance}\n---------------------------\n")
+        self.log_file.close()
+
+    # ------------------------- beeping
     def beep_control(self):
         while True:
             self.beep_event.wait()
             self.beep_event.clear()
+            self.manage_beep_thread()
+
+    def manage_beep_thread(self):
+        with self.beep_thread_lock:
+            if self.min_distance < 50:
+                if not self.constant_beep_thread_active or self.constant_beep_thread is None:
+                    self.start_constant_beep_thread()
+            else:
+                if self.constant_beep_thread is not None:
+                    self.stop_constant_beep_thread()
+                beep_interval = self.calculate_beep_interval()
+                if beep_interval is not None:
+                    self.start_beep_thread(beep_interval)
+
+    def calculate_beep_interval(self):
+        if self.min_distance <= 50:
+            return 0
+        elif self.min_distance <= 75:
+            return 0.005
+        elif self.min_distance <= 100:
+            return 0.09
+        elif self.min_distance <= 125:
+            return 0.2
+        elif self.min_distance <= 150:
+            return 0.4
+        return None
+
+    def start_beep_thread(self, beep_interval):
+        self.stop_beep_thread()  # Ensure no other thread is running
+        self.beep_thread_active = True
+        self.current_beep_thread = Thread(target=self.beep_in_loop, args=(beep_interval,))
+        self.current_beep_thread.daemon = True
+        self.current_beep_thread.start()
+
+    def stop_beep_thread(self):
+        self.beep_thread_active = False
+        if self.current_beep_thread is not None:
+            self.current_beep_thread.join()
+            self.current_beep_thread = None
+
+    def beep_in_loop(self, interval):
+        while self.beep_thread_active and self.min_distance <= 150:
+            winsound.Beep(900, 200)  # 900 Hz frequency, 0.2s duration
+            time.sleep(interval)
+
+    def start_constant_beep_thread(self):
+        self.stop_beep_thread()  # Ensure no other thread is running
+        self.constant_beep_thread_active = True
+        self.constant_beep_thread = Thread(target=self.constant_beep)
+        self.constant_beep_thread.daemon = True
+        self.constant_beep_thread.start()
+
+    def stop_constant_beep_thread(self):
+        self.constant_beep_thread_active = False
+        if self.constant_beep_thread is not None:
+            self.constant_beep_thread.join()
+            self.constant_beep_thread = None
+
+    def constant_beep(self):
+        while self.constant_beep_thread_active and self.min_distance < 50:
+            winsound.Beep(900, 1000)  # 900 Hz frequency, 1s duration
+
 
 if __name__ == "__main__":
     root = tk.Tk()
