@@ -1,6 +1,3 @@
-import winsound
-from threading import Thread, Event, Lock
-import time
 import tkinter as tk
 from tkinter import filedialog
 from threading import Thread, Event
@@ -134,7 +131,14 @@ class VideoApp:
             'car': 0
         }
 
+        # Start Prometheus metrics server
+        start_http_server(8000)
+
+        # Start monitoring thread
+        self.start_monitoring()
+
     def create_text_box(self, parent, height, width, side=tk.LEFT):
+        """Create and return a text box with given parameters."""
         text_box = tk.Text(parent, state=tk.DISABLED, height=height, width=width, bg="#535353", fg="#FFFFFF",
                            wrap=tk.WORD)
         text_box.pack(side=side, padx=(0, 10))
@@ -226,6 +230,11 @@ class VideoApp:
             else:
                 self.frame_info_label.config(text=f"Frame: {passed_frames}")
 
+            # Calculate and update FPS
+            elapsed_time = time.time() - start_time
+            fps = passed_frames / elapsed_time if elapsed_time > 0 else 0
+            self.fps_gauge.set(fps)
+
             # Sleep
             self.root.update_idletasks()
             self.root.update()
@@ -273,6 +282,7 @@ class VideoApp:
                 cv2.rectangle(overlay, (x1, y1), (x2, y2), color, -1)
                 frame = cv2.addWeighted(overlay, 0.5, frame, 0.5, 0)
                 self.proximity_text_box.config(state=tk.DISABLED, fg="red", bg="#535353")
+                self.send_incident_alert(name)  # Send MQTT alert and update incident counter
             elif 50 <= distance < 100:
                 messages.append(f"Warning! Pay attention to {name}.")
                 self.proximity_text_box.config(state=tk.DISABLED, fg="orange", bg="#535353")
@@ -331,10 +341,68 @@ class VideoApp:
             area = (x2 - x1) * (y2 - y1)
             areas.append(area)
         return areas
+
+    def update_prometheus_counters(self, objects_count):
+        for object_class, count in objects_count.items():
+            if object_class in self.object_counters:
+                increment = count - self.previous_counts[object_class]
+                if increment > 0:
+                    self.object_counters[object_class].inc(increment)
+                self.previous_counts[object_class] = count
+                print(f"{object_class} counter: {self.object_counters[object_class]._value.get()}")
+
+    def update_gauges(self, objects_count):
+        self.cars_detected_gauge.set(objects_count.get('car', 0))
+        self.persons_detected_gauge.set(objects_count.get('person', 0))
+        self.trees_detected_gauge.set(objects_count.get('tree', 0))
+        self.balls_detected_gauge.set(objects_count.get('ball', 0))
+
+    def send_incident_alert(self, object_name):
+        message = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - Incident occurred with {object_name}!"
+        self.producer.publish(self.topic, message, qos=1, retain=False)
+        self.counter_sending.inc()
+        self.bytes_sending.inc(len(message.encode('utf-8')))
+        self.incident_counter.inc()
+        print(f"MQTT Incident Alert Sent: {message}")
+        print(f"Incident counter: {self.incident_counter._value.get()}")
+
+    # Starts a thread to monitor CPU, RAM usage, and FPS.
+    def start_monitoring(self):
+        def monitor():
+            while True:
+                # Update CPU and RAM usage as a percentage
+                process = psutil.Process()
+                self.cpu_usage_gauge.set(process.cpu_percent(interval=1))
+                self.ram_usage_gauge.set(process.memory_percent())  # RAM usage in percentage
+
+                time.sleep(1)
+
+        Thread(target=monitor, daemon=True).start()
+
     def beep_control(self):
         while True:
             self.beep_event.wait()
             self.beep_event.clear()
+            beep_interval = None
+            if self.min_distance < 50:
+                beep_interval = 0.1
+            elif self.min_distance < 75:
+                beep_interval = 0.4
+            elif self.min_distance < 100:
+                beep_interval = 0.75
+            elif self.min_distance < 125:
+                beep_interval = 1
+            elif self.min_distance < 150:
+                beep_interval = 1.5
+            elif self.min_distance < 175:
+                beep_interval = 2
+
+            if beep_interval:
+                print(f"Beeping with interval: {beep_interval} seconds")
+                while self.min_distance < 175:
+                    winsound.Beep(1000, int(beep_interval * 1000))  # 1000 Hz frequency, duration in ms
+                    self.beep_event.wait(timeout=beep_interval)
+                    #print("Beep")
 
 # Setup the main window
 if __name__ == "__main__":

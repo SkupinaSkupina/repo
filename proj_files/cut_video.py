@@ -3,6 +3,7 @@ from moviepy.editor import VideoFileClip
 
 
 # Function to change the frame rate of a video
+
 def change_frame_rate(input_video_path, output_video_path, target_fps):
     # Load the video clip
     video = VideoFileClip(input_video_path)
