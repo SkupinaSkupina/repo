@@ -9,7 +9,6 @@ import torch
 import os
 from datetime import datetime
 
-
 class VideoApp:
     def __init__(self, root):
         self.root = root
