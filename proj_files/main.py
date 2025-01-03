@@ -1,13 +1,21 @@
+from asyncio import Event, Lock #importano
+from threading import Thread #importano
+import time #importano
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog #importano?? not sure
+import winsound #importano
 import cv2
 from PIL import Image, ImageTk
 import torch
 import os
+<<<<<<< HEAD
 from datetime import datetime
 from threading import Thread, Lock, Event
 import winsound
 import time
+=======
+from datetime import datetime #importano
+>>>>>>> 94c06cf2254f4113035f024465485dff754333a1
 
 class VideoApp:
     def __init__(self, root):
