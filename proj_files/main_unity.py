@@ -13,6 +13,9 @@ import socket
 from PIL import ImageGrab
 import numpy as np
 import io
+import win32gui
+import win32ui
+import win32con
 
 class VideoApp:
     def __init__(self, root):
@@ -43,6 +46,18 @@ class VideoApp:
         self.stop_button = tk.Button(button_frame, text="Stop", command=self.stop_video,
                                      bg="red", fg=text_color, font=('Helvetica', 12, 'bold'))
         self.stop_button.grid(row=0, column=2, padx=5)
+
+        # Add the start and stop streaming buttons to the same button frame
+        self.start_button = tk.Button(button_frame, text="Start Streaming", command=self.start_streaming, bg=button_color,
+                                      fg=text_color, font=('Helvetica', 12, 'bold'))
+        self.start_button.grid(row=0, column=3, padx=5)
+
+        self.stop_stream_button = tk.Button(button_frame, text="Stop Streaming", command=self.stop_streaming, bg="red",
+                                            fg=text_color, font=('Helvetica', 12, 'bold'))
+        self.stop_stream_button.grid(row=0, column=4, padx=5)
+
+        self.start_button.config(state=tk.NORMAL)  # Enable Start button
+        self.stop_stream_button.config(state=tk.DISABLED)  # Disable Stop button initially
 
         self.source_label = tk.Label(root, text="No video selected", bg=bg_color, fg=text_color)
         self.source_label.pack(pady=5)
@@ -121,16 +136,15 @@ class VideoApp:
         self.beep_thread.daemon = True
         self.beep_thread.start()
 
-        # Unity init
-        # Additional initialization
-        self.host = 'localhost'  # Specify Unity host
-        self.port = 12345  # Specify Unity port
+        self.cap_thread = None
+        self.stop_event = threading.Event()
 
-        self.socket_thread = threading.Thread(target=self.connect_to_unity)
-        self.socket_thread.daemon = True
-        self.socket_thread.start()
+        # Unity UDP server connection parameters
+        self.udp_ip = "127.0.0.1"  # Change to Unity server IP
+        self.udp_port = 12345  # Change to Unity UDP server port
+        self.udp_socket = None
+        self.connected = False
 
-        self.frame_rate = 30  # Desired frame rate
 
     def create_text_box(self, parent, height, width, side=tk.LEFT):
         """Create and return a text box with given parameters."""
@@ -433,60 +447,132 @@ class VideoApp:
             self.constant_beep_thread.join()
             self.constant_beep_thread = None
 
-# Unity connection and sending frame capture
-
+    # Unity connection and sending frame capture
     def connect_to_unity(self):
-        """Connect to the Unity server."""
+        """Attempt to establish a UDP connection to the Unity server."""
         try:
-            self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.client_socket.connect((self.host, self.port))
-            print(f"Connected to Unity server at {self.host}:{self.port}")
+            # Try to create a UDP socket and send a message to Unity
+            self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.udp_socket.settimeout(1)  # Timeout for socket operations
 
-            while True:
-                frame = self.capture_frame()
-                if frame is not None:
-                    self.send_frame(frame)
-                time.sleep(1 / self.frame_rate)
+            # Increase the buffer size to handle large messages
+            self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 2 ** 25)  # 32MB buffer size
+            self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 2 ** 25)  # Set send buffer size
+
+            # Send a test message to Unity's UDP server
+            self.udp_socket.sendto(b"Hello, Unity!", (self.udp_ip, self.udp_port))  # Ping Unity
+            self.connected = True
+            print("Connection to Unity established.")  # Success message
         except Exception as e:
-            print(f"Failed to connect to Unity server: {e}")
+            # If connection fails, print an error message
+            self.connected = False
+            print(f"Failed to connect to Unity: {e}")  # Error message
 
-    def capture_frame(self):
-        """Capture the current Tkinter window as an image."""
-        try:
-            # Capture the bounding box of the Tkinter window
-            bbox = (self.root.winfo_rootx(), self.root.winfo_rooty(),
-                    self.root.winfo_rootx() + self.root.winfo_width(),
-                    self.root.winfo_rooty() + self.root.winfo_height())
+    def capture_gui(self):
+        """Capture the current tkinter window as an image, even if minimized or in the background."""
+        # Get the window handle for the tkinter window
+        hwnd = win32gui.FindWindow(None, self.root.title())  # Use window title to get the hwnd
 
-            # Grab the image from the Tkinter window
-            img = ImageGrab.grab(bbox=bbox)
-            img = img.convert('RGB')  # Ensure the image is in RGB format
+        # Get window dimensions
+        left, top, right, bottom = win32gui.GetClientRect(hwnd)
+        width = right - left
+        height = bottom - top
 
-            # Convert the image to a byte array
-            img_byte_array = io.BytesIO()
+        # Check if the window dimensions are valid (i.e., the window is not minimized)
+        if width <= 0 or height <= 0:
+            print("Window is minimized or invalid dimensions")
+            return None  # If window is minimized, return None (invalid image)
 
-            # Send as JPEG (for better compression)
-            img.save(img_byte_array, format='JPEG')
+        # Create a device context (DC) to capture the screen
+        hdc = win32gui.GetWindowDC(hwnd)
+        src_dc = win32ui.CreateDCFromHandle(hdc)
 
-            # If you want to use PNG (lossless but larger), you can switch the format
-            # img.save(img_byte_array, format='PNG')
+        # Create a memory DC to store the captured image
+        mem_dc = src_dc.CreateCompatibleDC()
 
-            img_byte_array = img_byte_array.getvalue()
+        # Create a bitmap to store the image
+        bmp = win32ui.CreateBitmap()
+        bmp.CreateCompatibleBitmap(src_dc, width, height)
 
-            return img_byte_array
+        # Select the bitmap into the memory DC
+        mem_dc.SelectObject(bmp)
 
-        except Exception as e:
-            print(f"Error capturing frame: {e}")
-            return None
+        # Capture the image (bit block transfer from the window to the bitmap)
+        mem_dc.BitBlt((0, 0), (width, height), src_dc, (0, 0), win32con.SRCCOPY)
 
-    def send_frame(self, frame_data):
-        """Send the captured frame data over the socket."""
-        try:
-            frame_size = len(frame_data)  # Size of the frame to send
-            self.client_socket.sendall(frame_size.to_bytes(4, 'big'))  # Send frame size
-            self.client_socket.sendall(frame_data)  # Send frame data
-        except Exception as e:
-            print(f"Error sending frame: {e}")
+        # Convert the bitmap to a PIL image
+        signed_ints = bmp.GetBitmapBits(True)
+        img = np.frombuffer(signed_ints, dtype=np.uint8)
+
+        # Ensure the image has valid size (to avoid reshaping errors)
+        if img.size != width * height * 4:
+            print("Invalid image size")
+            return None  # If image size is invalid, return None (invalid image)
+
+        img = img.reshape((height, width, 4))  # RGBA format
+
+        # Convert to an Image object (PIL format)
+        pil_img = Image.fromarray(img)
+
+        # Convert the image from RGBA to RGB (remove alpha channel)
+        pil_img = pil_img.convert("RGB")
+
+        # Resize the image to a smaller size (for example, to 640x480)
+        pil_img = pil_img.resize((640, 480))
+
+        # Clean up
+        src_dc.DeleteDC()
+        mem_dc.DeleteDC()
+        win32gui.ReleaseDC(hwnd, hdc)
+
+        return pil_img
+
+    def send_frame(self):
+        """Capture and send frames continuously."""
+        while not self.stop_event.is_set():
+            img = self.capture_gui()
+            if img is None:
+                print("Capture failed, skipping frame.")
+                continue  # Skip the frame if capture failed
+
+            # Convert the image to JPEG and send it over UDP
+            byte_arr = io.BytesIO()
+            img.save(byte_arr, format='JPEG')
+            img_bytes = byte_arr.getvalue()
+
+            if self.connected:
+                try:
+                    self.udp_socket.sendto(img_bytes, (self.udp_ip, self.udp_port))
+                except Exception as e:
+                    print(f"Error sending frame to Unity: {e}")
+                    self.connected = False
+                    break
+
+            # Add a short delay before sending the next frame
+            self.stop_event.wait(0.05)  # This gives a frame rate of about 20 FPS
+
+    def start_streaming(self):
+        """Start streaming the GUI capture."""
+        self.start_button.config(state=tk.DISABLED)  # Disable Start button while streaming
+        self.stop_stream_button.config(state=tk.NORMAL)  # Enable Stop button while streaming
+
+        if not self.cap_thread or not self.cap_thread.is_alive():
+            self.stop_event.clear()
+            self.cap_thread = threading.Thread(target=self.send_frame)
+            self.cap_thread.start()
+            print("Started streaming GUI to Unity.")
+
+        self.connect_to_unity()  # Attempt connection to Unity when starting streaming
+
+    def stop_streaming(self):
+        """Stop streaming the GUI capture."""
+        self.start_button.config(state=tk.NORMAL)  # Re-enable Start button when stopped
+        self.stop_stream_button.config(state=tk.DISABLED)  # Disable Stop button when stopped
+
+        self.stop_event.set()
+        if self.cap_thread:
+            self.cap_thread.join()
+        print("Stopped streaming GUI.")
 
 if __name__ == "__main__":
     root = tk.Tk()
