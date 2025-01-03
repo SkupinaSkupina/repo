@@ -7,11 +7,11 @@ import os
 from datetime import datetime
 import time
 from threading import Thread, Lock, Event
+import threading
 import winsound
 import socket
 from PIL import ImageGrab
 import numpy as np
-import threading
 import io
 
 class VideoApp:

@@ -5,6 +5,9 @@ from PIL import Image, ImageTk
 import torch
 import os
 from datetime import datetime
+from threading import Thread, Lock, Event
+import winsound
+import time
 
 class VideoApp:
     def __init__(self, root):
