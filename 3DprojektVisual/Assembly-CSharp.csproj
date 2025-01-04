@@ -60,7 +60,11 @@
     <Analyzer Include="C:\Program Files\Unity\Hub\Editor\6000.0.32f1\Editor\Data\Tools\Unity.SourceGenerators\Unity.UIToolkit.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Assets\SocketImageReceiver.cs" />
+    <Compile Include="Assets\StreamReceiver.cs" />
+    <Compile Include="Assets\PythonIntegration.cs" />
     <Compile Include="Assets\TutorialInfo\Scripts\Readme.cs" />
+    <Compile Include="Assets\UnityMainThreadDispatcher.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="UnityEngine">
