@@ -16,8 +16,11 @@ import io
 import win32gui
 import win32ui
 import win32con
+# LED communication include
+import serial
+import argparse
 
-class VideoApp:
+class VideoApp:    
     def __init__(self, root):
         self.root = root
         self.root.title("Yolo Object Detection Prototype")
@@ -34,6 +37,11 @@ class VideoApp:
         # Create and place the widgets
         button_frame = tk.Frame(root, bg=bg_color)
         button_frame.pack(pady=10)
+
+        # Začetni pogoji
+        self.ser = self.setup_serial()
+        if self.ser:
+            self.send_command(self.ser, 'OFF')  # Pošlji OFF na začetku, 416 in 594 dalje za serial ON/OFF
 
         self.select_button = tk.Button(button_frame, text="Select Video", command=self.select_video_file,
                                        bg=button_color, fg=text_color, font=('Helvetica', 12, 'bold'))
@@ -135,6 +143,7 @@ class VideoApp:
         self.beep_thread = Thread(target=self.beep_control)
         self.beep_thread.daemon = True
         self.beep_thread.start()
+        
 
         self.cap_thread = None
         self.stop_event = threading.Event()
@@ -169,6 +178,7 @@ class VideoApp:
     def load_webcam_stream(self):
         self.source_label.config(text="Webcam Stream")
         self.run_detection(0)  # 0 default webcam index
+
 
     def run_detection(self, source):
         # Open video source
@@ -404,7 +414,14 @@ class VideoApp:
                     self.start_beep_thread(beep_interval)
 
     def calculate_beep_interval(self):
+        """Izračuna interval piskanja glede na razdaljo in pošlje 'ON', če je razdalja <= 50."""
         if self.min_distance <= 50:
+            # Preverite, ali je serijska povezava vzpostavljena
+            if self.ser:
+                self.send_command(self.ser, 'ON')  # Pošlji ukaz 'ON', ne dela
+                print("ON command sent.")
+            else:
+                print("Serijska povezava ni odprta!")
             return 0
         elif self.min_distance <= 75:
             return 0.005
@@ -574,7 +591,51 @@ class VideoApp:
             self.cap_thread.join()
         print("Stopped streaming GUI.")
 
+    def start_serial(self):
+        """Zažene serijsko povezavo in pošlje ukaz."""
+        ser = self.setup_serial()
+        if ser:
+            self.send_command(ser, 'ON')
+        self.close_serial(ser)
+
+    def setup_serial(self):
+        try:
+            # Povezava na serijski port, npr. COM3
+            ser = serial.Serial(port='COM5', baudrate=115200, timeout=1)  # Določite pravi COM port
+            print("Serijska povezava vzpostavljena.")
+            return ser
+        except serial.SerialException as e:
+            print(f"Napaka pri povezavi: {e}")
+            return None
+
+    def send_command(self, ser, command):
+        """Pošlje ukaz prek serijske povezave."""
+        if ser and ser.is_open:
+            ser.write(command.encode() + b'\n')  # Pošlje ukaz, zaključi z novim vrstičnim prenosom
+            print(f"Poslano: {command}")
+            time.sleep(0.1)  # Počaka na obdelavo ukaza
+        else:
+            print("Serijska vrata niso odprta.")
+
+    def close_serial(self, ser):
+        """Zapre serijsko povezavo."""
+        if ser and ser.is_open:
+            ser.close()
+            print("Serijska povezava zaprta.")
+
 if __name__ == "__main__":
+    # GUI del
     root = tk.Tk()
     app = VideoApp(root)
+
+    # argparse del - ta se bo izvedel po zaprtju GUI
+    parser = argparse.ArgumentParser(description="Pošlji ukaze serijski napravi.")
+    parser.add_argument('--serial', action='store_true', help="Omogoči serijsko povezavo in pošlji ukaz.")
+    args = parser.parse_args()
+
+    # Start GUI
     root.mainloop()
+
+    # Zaprtje serijske povezave ob koncu programa
+    if app.ser:
+        app.close_serial(app.ser)
