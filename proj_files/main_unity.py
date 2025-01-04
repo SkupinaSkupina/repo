@@ -305,6 +305,18 @@ class VideoApp:
             # Display distance
             frame = cv2.putText(frame, f"{distance} px", bottom_center, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
+            if distance < 50:
+                if self.ser:
+                    self.send_command(self.ser, 'ON')  # Pošlji ukaz 'ON', ne dela
+                    print("ON command sent.")
+                else:
+                    print("Serijska povezava ni odprta!")
+            else:
+                if self.ser:
+                    self.send_command(self.ser, 'OFF')  # Pošlji ukaz 'ON', ne dela
+                    print("OFF command sent.")
+                else:
+                    print("Serijska povezava ni odprta!")
             # Determine message based on fixed distance
             if distance < 50:
                 messages.append(f"Stop immediately! {name} is too close!")
