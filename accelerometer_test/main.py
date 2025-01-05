@@ -21,10 +21,16 @@ try:
 
             # Unpack the raw data with reversed header
             # First 2 bytes as `unsigned short` to avoid signed interpretation
-            header, x= struct.unpack('<Hh', data)
+            header, smer_voznje = struct.unpack('<HH', data)
 
             if header == 0xaaab:
-                print(x)
+                if smer_voznje == 0xfffc:
+                    print("vozimo NAZAJ")
+                elif smer_voznje == 0xcccf:
+                    print("vozimo NAPREJ")
+                else:
+                    print("Unknown")
+
             else:
                 print(f"Invalid packet header: {hex(header)}")
         else:

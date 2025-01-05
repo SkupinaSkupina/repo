@@ -8,6 +8,8 @@ from PIL import Image, ImageTk
 import torch
 import os
 from datetime import datetime
+from accelerometer_module import AccelerometerModule
+import threading
 
 
 class VideoApp:
@@ -117,6 +119,19 @@ class VideoApp:
         self.beep_thread.daemon = True
         self.beep_thread.start()
 
+        # Accelerometer module
+        self.accelerometer = AccelerometerModule('COM3', 115200)
+        self.running = True
+
+        # Attempt to connect the accelerometer
+        self.accelerometer.connect()
+
+        # Start accelerometer reading in a separate thread
+        self.start_accelerometer_reader()
+
+        # Ensure clean shutdown of accelerometer
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+
     def create_text_box(self, parent, height, width, side=tk.LEFT):
         text_box = tk.Text(parent, state=tk.DISABLED, height=height, width=width, bg="#535353", fg="#FFFFFF",
                            wrap=tk.WORD)
@@ -176,11 +191,10 @@ class VideoApp:
                 break
 
             passed_frames += 1
+            if passed_frames % 2 == 0:  # Skip every other frame for better performance
+                continue
 
-            # Size of video frame
             frame = cv2.resize(frame, (800, 450))
-
-            # Perform object detection
             results = self.model(frame, size=640)
 
             # Filter results
@@ -294,20 +308,29 @@ class VideoApp:
             self.proximity_text_box.insert(tk.END, f"{message}\n")
         self.proximity_text_box.config(state=tk.DISABLED)
 
+    #def update_canvas(self, frame):
+    #    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    #    img = Image.fromarray(frame_rgb)
+    #    imgtk = ImageTk.PhotoImage(image=img)
+
+        # Calculate offsets to center the image
+    #    canvas_width = self.canvas.winfo_width()
+    #    canvas_height = self.canvas.winfo_height()
+    #    img_width, img_height = imgtk.width(), imgtk.height()
+    #    x_offset = (canvas_width - img_width) // 2
+    #    y_offset = (canvas_height - img_height) // 2
+
+    #    self.canvas.create_image(x_offset, y_offset, anchor=tk.NW, image=imgtk)
+    #    self.canvas.image = imgtk
+
     def update_canvas(self, frame):
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img = Image.fromarray(frame_rgb)
         imgtk = ImageTk.PhotoImage(image=img)
 
-        # Calculate offsets to center the image
-        canvas_width = self.canvas.winfo_width()
-        canvas_height = self.canvas.winfo_height()
-        img_width, img_height = imgtk.width(), imgtk.height()
-        x_offset = (canvas_width - img_width) // 2
-        y_offset = (canvas_height - img_height) // 2
-
-        self.canvas.create_image(x_offset, y_offset, anchor=tk.NW, image=imgtk)
+        self.canvas.create_image(0, 0, anchor=tk.NW, image=imgtk)
         self.canvas.image = imgtk
+        self.root.update_idletasks()  # Limit to essential GUI updates
 
     def update_textbox(self, objects_count):
         self.text_box.config(state=tk.NORMAL)
@@ -420,6 +443,33 @@ class VideoApp:
         while self.constant_beep_thread_active and self.min_distance < 50:
             winsound.Beep(900, 1000)  # 900 Hz frequency, 1s duration
 
+    # ------------------------- Accelerometer
+
+    def start_accelerometer_reader(self):
+        def read_data():
+            while self.running:
+                packet = self.accelerometer.read_packet()
+                if packet:
+                    header, smer_voznje = packet
+                    if header == 0xaaab:
+                        if smer_voznje == 0xfffc:  # "Vozimo NAZAJ"
+                            self.load_webcam_stream()
+                            print("Vozimo NAZAJ")
+                        elif smer_voznje == 0xcccf:  # "Vozimo NAPREJ"
+                            self.stop_video()
+                            print("Vozimo NAPREJ")
+                        else:
+                            print("Unknown packet...")
+                time.sleep(0.01)  # Reduce CPU usage by adding a small delay
+
+        self.accelerometer_thread = threading.Thread(target=read_data, daemon=True)
+        self.accelerometer_thread.start()
+
+    def on_close(self):
+        """Cleanly shuts down the application and accelerometer."""
+        self.running = False
+        self.accelerometer.close()  # Ensure the accelerometer connection is closed
+        self.root.destroy()
 
 if __name__ == "__main__":
     root = tk.Tk()
