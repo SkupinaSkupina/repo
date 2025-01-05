@@ -200,6 +200,11 @@ class VideoApp:
         Thread(target=self.process_frame).start()
 
     def stop_video(self):
+        if self.ser:
+            self.send_command(self.ser, 'OFF')  # Pošlji ukaz 'ON'
+            print("OFF command sent.")
+        else:
+            print("Serijska povezava ni odprta!")
         # Stop the frame processing
         self.stop_event.set()
 
@@ -307,16 +312,11 @@ class VideoApp:
 
             if distance < 50:
                 if self.ser:
-                    self.send_command(self.ser, 'ON')  # Pošlji ukaz 'ON', ne dela
+                    self.send_command(self.ser, 'ON')  # Pošlji ukaz 'ON'
                     print("ON command sent.")
                 else:
                     print("Serijska povezava ni odprta!")
-            else:
-                if self.ser:
-                    self.send_command(self.ser, 'OFF')  # Pošlji ukaz 'ON', ne dela
-                    print("OFF command sent.")
-                else:
-                    print("Serijska povezava ni odprta!")
+            
             # Determine message based on fixed distance
             if distance < 50:
                 messages.append(f"Stop immediately! {name} is too close!")
