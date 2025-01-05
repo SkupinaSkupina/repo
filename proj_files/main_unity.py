@@ -202,7 +202,7 @@ class VideoApp:
     def stop_video(self):
         if self.ser:
             self.send_command(self.ser, 'OFF')  # Pošlji ukaz 'ON'
-            print("OFF command sent.")
+            print("OFF command sent.") # OFF se poslje ko stisnes button 'STOP'
         else:
             print("Serijska povezava ni odprta!")
         # Stop the frame processing
