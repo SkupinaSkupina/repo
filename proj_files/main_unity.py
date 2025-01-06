@@ -428,12 +428,6 @@ class VideoApp:
     def calculate_beep_interval(self):
         """Izračuna interval piskanja glede na razdaljo in pošlje 'ON', če je razdalja <= 50."""
         if self.min_distance <= 50:
-            # Preverite, ali je serijska povezava vzpostavljena
-            if self.ser:
-                self.send_command(self.ser, 'ON')  # Pošlji ukaz 'ON', ne dela
-                print("ON command sent.")
-            else:
-                print("Serijska povezava ni odprta!")
             return 0
         elif self.min_distance <= 75:
             return 0.005

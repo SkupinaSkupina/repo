@@ -427,6 +427,7 @@
 -analyzer:"C:/Program Files/Unity/Hub/Editor/6000.0.32f1/Editor/Data/Tools/Unity.SourceGenerators/Unity.SourceGenerators.dll"
 -analyzer:"C:/Program Files/Unity/Hub/Editor/6000.0.32f1/Editor/Data/Tools/Unity.SourceGenerators/Unity.UIToolkit.SourceGenerator.dll"
 "Assets/3Dmodels/ON_OFF_led.cs"
+"Assets/MainThreadExecutor.cs"
 "Assets/StreamReceiver.cs"
 "Assets/TutorialInfo/Scripts/Readme.cs"
 -langversion:9.0
