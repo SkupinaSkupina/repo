@@ -25,7 +25,7 @@ public class ON_OFF_led : MonoBehaviour
 
     private void ReceiveUdpMessages()
     {
-        IPEndPoint remoteEndPoint = new IPEndPoint(IPAddress.Any, 12345);
+        IPEndPoint remoteEndPoint = new IPEndPoint(IPAddress.Any, 22345);
 
         try
         {
