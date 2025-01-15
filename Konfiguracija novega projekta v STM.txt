@@ -1,0 +1,43 @@
+Konfiguracija novega projekta v STM32
+
+Ustvari nov projekt
+
+File -> New -> STM32 Project
+
+Board Selector -> STM32F411E-DISCO -> Next
+
+Project Name: FreeRTOS_ogrodje
+(ostalo default)
+-> Finish
+
+Znotraj FreeRTOS_ogrodje.ioc GUI izberes odsek A->Z
+
+FREERTOS -> Interface -> "CMSIS_V2"
+         -> Advanced settings -> USE_NEWLIB_REENTRANT = "Enabled"
+
+I2C1 -> Parameter Settings  -> I2C Speed Mode = "Fast Mode"
+			    -> Fast Mode Duty Cycle = "Duty cycle Tlow/Thigh = 16/9"
+
+RCC -> High Speed Clock (HSE) = "Crystal/Ceramic Resonator"
+
+SYS -> Debug = "Disable" (verjetno je treba poscrollat navzgor)
+    -> Timebase Source = "TIM2"
+
+USB_OTG_FS -> Mode = "Device Only"
+
+USB_DEVICE -> Class For FS IP = "Communication Device Class (Virtual Com Port)"
+           -> Device Descriptor -> PRODUCT_STRING (Product Identifier) = "Skupina: Skupina STM"
+
+Ctrl+S (shranni in generiraj kodo)
+
+
+main.c se lahko copy-paste-a
+
+OBVEZNO: Znotraj usb_device.c v funkciji MX_USB_DEVICE_Init() dodaj ta odsek:
+
+/* Configure and enable the USB interrupt */
+HAL_NVIC_SetPriority(OTG_FS_IRQn, 5, 0);  // Priority level should be >= 5 for FreeRTOS compatibility
+HAL_NVIC_EnableIRQ(OTG_FS_IRQn);
+/* USER CODE END USB_DEVICE_Init_PostTreatment */
+
+Zdaj bi moglo delat
