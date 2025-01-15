@@ -272,7 +272,11 @@ void * pvPortMalloc( size_t xWantedSize )
     {
         if( pvReturn == NULL )
         {
+<<<<<<< HEAD
+            vApplicationMallocFailedHook();
+=======
             //vApplicationMallocFailedHook();
+>>>>>>> 1fd9d68f2f0e89a2f71373c5e371085cd1624b83
         }
         else
         {

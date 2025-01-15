@@ -1,0 +1,21 @@
+19:24:53 **** Incremental Build of configuration Debug for project FreeRTOS_ogrodje ****
+make -j12 all 
+arm-none-eabi-gcc "../Core/Src/main.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F411xE -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -I../USB_DEVICE/App -I../USB_DEVICE/Target -I../Middlewares/Third_Party/FreeRTOS/Source/include -I../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I../Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F -I../Middlewares/ST/STM32_USB_Device_Library/Core/Inc -I../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/main.d" -MT"Core/Src/main.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/main.o"
+../Core/Src/main.c: In function 'Opravilo_CDC_Transmit':
+../Core/Src/main.c:641:25: warning: implicit declaration of function 'CDC_Transmit_FS' [-Wimplicit-function-declaration]
+  641 |                         CDC_Transmit_FS((uint8_t *)&txPacket, sizeof(txPacket));
+      |                         ^~~~~~~~~~~~~~~
+arm-none-eabi-gcc -o "FreeRTOS_ogrodje.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\.project\FreeRTOS_ogrodje\STM32F411VETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="FreeRTOS_ogrodje.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: FreeRTOS_ogrodje.elf
+ 
+arm-none-eabi-size  FreeRTOS_ogrodje.elf 
+arm-none-eabi-objdump -h -S FreeRTOS_ogrodje.elf  > "FreeRTOS_ogrodje.list"
+   text	   data	    bss	    dec	    hex	filename
+  51148	    336	  28352	  79836	  137dc	FreeRTOS_ogrodje.elf
+Finished building: default.size.stdout
+ 
+Finished building: FreeRTOS_ogrodje.list
+ 
+
+19:24:54 Build Finished. 0 errors, 1 warnings. (took 918ms)
+

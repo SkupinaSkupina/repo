@@ -20,7 +20,8 @@ try:
             #print(f"Raw data: {data.hex()}")
 
             # Unpack the raw data with reversed header
-            # First 2 bytes as `unsigned short` to avoid signed interpretation
+            # First 2 py main.py
+            # bytes as `unsigned short` to avoid signed interpretation
             header, smer_voznje = struct.unpack('<HH', data)
 
             if header == 0xaaab:
@@ -33,8 +34,8 @@ try:
 
             else:
                 print(f"Invalid packet header: {hex(header)}")
-        else:
-            print("Incomplete data received")
+        #else:
+            #print("Incomplete data received")
 
         #time.sleep(0.1)
 
