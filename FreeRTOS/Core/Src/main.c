@@ -20,7 +20,11 @@
 #include "main.h"
 #include "usb_device.h"
 #include "FreeRTOS.h"
+<<<<<<< HEAD
 #include "tasks.h"
+=======
+#include "include/task.h"
+>>>>>>> 1fd9d68f2f0e89a2f71373c5e371085cd1624b83
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
