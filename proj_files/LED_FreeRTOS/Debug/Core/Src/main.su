@@ -1,0 +1,12 @@
+../Core/Src/main.c:85:6:Opravilo_LED	24	static
+../Core/Src/main.c:112:5:main	16	static
+../Core/Src/main.c:144:6:SystemClock_Config	88	static
+../Core/Src/main.c:189:6:PeriphCommonClock_Config	32	static
+../Core/Src/main.c:210:13:MX_I2C1_Init	8	static
+../Core/Src/main.c:244:13:MX_I2S2_Init	8	static
+../Core/Src/main.c:278:13:MX_I2S3_Init	8	static
+../Core/Src/main.c:312:13:MX_SPI1_Init	8	static
+../Core/Src/main.c:350:13:MX_GPIO_Init	56	static
+../Core/Src/main.c:440:6:StartDefaultTask	16	static
+../Core/Src/main.c:461:6:HAL_TIM_PeriodElapsedCallback	16	static
+../Core/Src/main.c:478:6:Error_Handler	4	static,ignoring_inline_asm
