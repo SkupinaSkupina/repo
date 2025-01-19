@@ -43,6 +43,11 @@ class VideoApp:
                                      bg="red", fg=text_color, font=('Helvetica', 12, 'bold'))
         self.stop_button.grid(row=0, column=2, padx=5)
 
+        self.incident_report_button = tk.Button(button_frame, text="Incident Reporter",
+                                                command=self.show_incident_reporter,
+                                                bg="orange", fg=text_color, font=('Helvetica', 12, 'bold'))
+        self.incident_report_button.grid(row=0, column=3, padx=5)
+
         self.source_label = tk.Label(root, text="No video selected", bg=bg_color, fg=text_color)
         self.source_label.pack(pady=5)
 
@@ -67,7 +72,6 @@ class VideoApp:
         #self.main_frame.grid_columnconfigure(0, weight=3)
         #self.main_frame.grid_columnconfigure(1, weight=1)
 
-        # Canvas for video output
         # Canvas for video output
         self.canvas = tk.Canvas(self.main_frame, width=854, height=480, bg="#202020", borderwidth=0,
                                 highlightthickness=0)
@@ -127,6 +131,14 @@ class VideoApp:
         self.beep_thread.daemon = True
         self.beep_thread.start()
 
+        # preload the camera so it opens faster
+        self.cap = None
+        self.camera_ready = False
+        self.preload_camera()
+
+        if not self.camera_ready:
+            print("Initial camera preload failed. Camera may need manual initialization.")
+
         # Accelerometer module
         self.accelerometer = AccelerometerModule('COM3', 115200)
         self.running = True
@@ -160,16 +172,47 @@ class VideoApp:
             self.source_label.config(text=file_path)
             self.run_detection(file_path)
 
+    def preload_camera(self):
+        """Preload the camera and retain the handle."""
+        if self.cap is None or not self.cap.isOpened():
+            # Attempt to open the camera
+            self.cap = cv2.VideoCapture(0)
+            if self.cap.isOpened():
+                # Set desired camera properties
+                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 854)
+                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                self.cap.set(cv2.CAP_PROP_FPS, 30)
+                self.camera_ready = True
+                print("Camera preloaded and ready with properties set.")
+            else:
+                # Handle unsuccessful preload
+                self.camera_ready = False
+                print("Error: Could not preload the camera.")
+
     def load_webcam_stream(self):
+        """Load the webcam stream using the preloaded camera."""
         self.source_label.config(text="Webcam Stream")
-        self.run_detection(0)  # 0 default webcam index
+        if not self.camera_ready or not self.cap or not self.cap.isOpened():
+            print("Camera not ready. Attempting to preload the camera...")
+            self.preload_camera()
+
+        if self.camera_ready and self.cap.isOpened():
+            print("Starting detection with preloaded webcam.")
+            self.run_detection(0)  # Webcam source is usually index 0
+        else:
+            print("Error: Unable to start webcam stream. Camera not ready.")
 
     def run_detection(self, source):
-        # Open video source
-        self.cap = cv2.VideoCapture(source)
+        if source == 0 and self.cap and self.cap.isOpened():
+            print("Using preloaded webcam.")
+        else:
+            # Open video file or initialize a new video source
+            self.cap = cv2.VideoCapture(source)
+            if source == 0:  # Reset camera_ready for webcam
+                self.camera_ready = self.cap.isOpened()
 
         # Check if the video is opened successfully
-        if not self.cap.isOpened():
+        if not self.cap or not self.cap.isOpened():
             print("Error: Could not open video.")
             return
 
@@ -187,9 +230,20 @@ class VideoApp:
         # Stop the frame processing
         self.stop_event.set()
 
+        for _ in range(3):
+            self.stop_beep_thread()  # Stop intermittent beeping
+            self.stop_constant_beep_thread()  # Stop constant beeping
+            self.beep_event.clear()  # Prevent further triggering of beep_event
+
         # Save the recording if necessary
         if self.recording:
             self.stop_recording()
+
+        # Release the video capture if opened
+        if self.cap and self.cap.isOpened():
+            self.cap.release()
+
+        print("Video stopped")
 
     def process_frame(self):
         passed_frames = 0
@@ -500,11 +554,13 @@ class VideoApp:
                     header, smer_voznje = packet
                     if header == 0xaaab:
                         if smer_voznje == 0xfffc:  # "Vozimo NAZAJ"
-                            self.load_webcam_stream()
                             print("Vozimo NAZAJ")
+                            self.load_webcam_stream()
+
                         elif smer_voznje == 0xcccf:  # "Vozimo NAPREJ"
-                            self.stop_video()
                             print("Vozimo NAPREJ")
+                            self.stop_video()
+
                         else:
                             print("Unknown packet...")
                     else:
@@ -512,6 +568,100 @@ class VideoApp:
 
         self.accelerometer_thread = threading.Thread(target=read_data, daemon=True)
         self.accelerometer_thread.start()
+
+
+    # ------------------------- Incident reporter window
+    def show_incident_reporter(self):
+        """Display the incident reporter window."""
+        reporter_window = tk.Toplevel(self.root)
+        reporter_window.title("Incident Reporter")
+        reporter_window.geometry('895x870')
+        reporter_window.config(bg="#353535")
+
+        # Scrollable frame
+        canvas = tk.Canvas(reporter_window, bg="#353535")
+        scrollbar = tk.Scrollbar(reporter_window, orient="vertical", command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas, bg="#353535")
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Load incidents from the "incident_report" folder
+        incident_folder = "incident_report"
+        incidents = []
+        if os.path.exists(incident_folder):
+            for file in os.listdir(incident_folder):
+                if file.endswith(".mp4"):
+                    # Extract timestamp from the file name
+                    timestamp = file.split("_incident_video")[0]
+                    try:
+                        date_time = datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
+                    except ValueError:
+                        continue
+                    incidents.append((date_time, file))
+
+        # Sort incidents by date (most recent first)
+        incidents.sort(key=lambda x: x[0], reverse=True)
+
+        # Display incidents
+        for date_time, video_file in incidents:
+            # Frame for each incident
+            incident_frame = tk.Frame(scrollable_frame, bg="#535353", pady=10, padx=10)
+            incident_frame.pack(fill="x", pady=5)
+
+            # Date and time label
+            date_label = tk.Label(incident_frame, text=date_time.strftime("%Y-%m-%d %H:%M:%S"),
+                                  bg="#535353", fg="#FFFFFF", font=("Helvetica", 12, "bold"))
+            date_label.pack(anchor="w")
+
+            # Thumbnail preview
+            thumbnail_label = tk.Label(incident_frame, bg="#535353")
+            thumbnail_label.pack(anchor="w", pady=5)
+
+            # Generate thumbnail from video
+            thumbnail = self.generate_video_thumbnail(os.path.join(incident_folder, video_file))
+            if thumbnail:
+                thumbnail_label.img = thumbnail
+                thumbnail_label.config(image=thumbnail)
+
+            # Play video button
+            play_button = tk.Button(incident_frame, text="Play", bg="darkcyan", fg="#FFFFFF",
+                                    command=lambda vf=video_file: self.play_video(vf))
+            play_button.pack(anchor="e", pady=5)
+
+    def generate_video_thumbnail(self, video_path):
+        """Generate a thumbnail image from a video."""
+        try:
+            cap = cv2.VideoCapture(video_path)
+            ret, frame = cap.read()
+            cap.release()
+
+            if ret:
+                # Resize frame for thumbnail
+                frame = cv2.resize(frame, (200, 120))
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                img = Image.fromarray(frame)
+                return ImageTk.PhotoImage(img)
+        except Exception as e:
+            print(f"Error generating thumbnail for {video_path}: {e}")
+        return None
+
+    def play_video(self, video_file):
+        """Play the selected video file."""
+        video_path = os.path.join("incident_report", video_file)
+        if os.path.exists(video_path):
+            os.startfile(video_path)
+        else:
+            print(f"Video file not found: {video_path}")
+
 
     def on_close(self):
         """Cleanly shuts down the application and accelerometer."""
