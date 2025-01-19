@@ -201,7 +201,7 @@ class VideoApp:
 
     def stop_video(self):
         if self.ser:
-            self.send_command(self.ser, 'OFF')  # Pošlji ukaz 'ON'
+            self.send_command(self.ser, 'OFF')  # Pošlji ukaz 'OFF'
             print("OFF command sent.") # OFF se poslje ko stisnes button 'STOP'
         else:
             print("Serijska povezava ni odprta!")
@@ -310,12 +310,31 @@ class VideoApp:
             # Display distance
             frame = cv2.putText(frame, f"{distance} px", bottom_center, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
-            if distance < 50:
+            # Spremenljivke za spremljanje, ali je bil ukaz že poslan
+            command_sent = False
+
+            if distance == 100 and not command_sent:
                 if self.ser:
-                    self.send_command(self.ser, 'ON')  # Pošlji ukaz 'ON'
-                    print("ON command sent.")
+                    self.send_command(self.ser, 'TOGGLE SLOW')
+                    print("TOGGLE SLOW command sent.")
                 else:
                     print("Serijska povezava ni odprta!")
+
+            elif distance == 80 and not command_sent:
+                if self.ser:
+                    self.send_command(self.ser, 'TOGGLE FAST')
+                    print("TOGGLE FAST command sent.")
+                else:
+                    print("Serijska povezava ni odprta!")
+
+            elif distance == 50 and not command_sent:
+                if self.ser:
+                    self.send_command(self.ser, 'ON')
+                    print("ON command sent.")
+                    command_sent = True  # Označi, da je bil ukaz poslan
+                else:
+                    print("Serijska povezava ni odprta!")
+
             
             # Determine message based on fixed distance
             if distance < 50:

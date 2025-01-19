@@ -74,9 +74,19 @@ static void MX_SPI1_Init(void);
   */
 void ProcessCommand(char* cmd) {
     if (strcmp(cmd, "ON") == 0) {
-    	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_SET); // Prižgi rdečo LED
+    	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_SET); // Prizgi rdeco LED
     } else if (strcmp(cmd, "OFF") == 0){
-    	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET); // Ugasi rdečo LED
+    	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET); // Ugasni rdeco LED
+    } else if (strcmp(cmd, "TOGGLE FAST") == 0){
+        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_SET); 
+        HAL_Delay(200); // Počakaj 500 ms, da utripa hitreje
+        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET); 
+        HAL_Delay(200); // Počakaj 500 ms    
+    } else if (strcmp(cmd, "TOGGLE SLOW") == 0){
+        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_SET); 
+        HAL_Delay(500); // Počakaj 500 ms, da utripa pocasi
+        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET); 
+        HAL_Delay(500); // Počakaj 500 ms    
     }
 }
 int main(void)
