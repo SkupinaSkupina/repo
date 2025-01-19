@@ -66,14 +66,15 @@ def compression(number_list):
                 i += 1
             add_bits(binary_stream, zero_count - 1, 3)
         else:
-            add_bits(binary_stream, 2, 2)
-            add_bits(binary_stream, 0 if diff > 0 else 1, 1)
-            add_bits(binary_stream, abs(diff), 8)
+            add_bits(binary_stream, 2, 2)  # Prefix for large differences
+            add_bits(binary_stream, 0 if diff > 0 else 1, 1)  # Sign
+            add_bits(binary_stream, abs(diff), 13)  # Absolute value of difference
 
         i += 1
 
     add_bits(binary_stream, 3, 2)
     return binary_stream
+
 
 # Function to convert binary stream to a string
 def binary_stream_to_string(binary_stream):
@@ -120,7 +121,7 @@ def decompression(compressed_stream):
             decompressed_numbers.extend([current_number] * (zero_count + 1))
         elif prefix == 0b10:
             sign, position = read_bits(binary_string, position, 1)
-            abs_delta, position = read_bits(binary_string, position, 8)
+            abs_delta, position = read_bits(binary_string, position, 13)
             delta = -abs_delta if sign == 1 else abs_delta
             current_number += delta
             decompressed_numbers.append(current_number)
@@ -129,11 +130,12 @@ def decompression(compressed_stream):
 
     return decompressed_numbers
 
+
 # Example usage
 def main():
     random.seed(time.time())
 
-    example_numbers = [55, 53, 53, 53, 53, 53, 10, 10, 11, 11, 11, 11]
+    example_numbers = [55, 530, 53, 53, 5300, 53, 10, 10, 11, 11, 11, 11]
 
     compressed = compression(example_numbers)
     print("Compressed binary stream:", binary_stream_to_string(compressed))
