@@ -134,7 +134,7 @@ class VideoApp:
         # preload the camera so it opens faster
         self.cap = None
         self.camera_ready = False
-        self.preload_camera()
+        #self.preload_camera()
 
         if not self.camera_ready:
             print("Initial camera preload failed. Camera may need manual initialization.")
@@ -632,10 +632,49 @@ class VideoApp:
                 thumbnail_label.img = thumbnail
                 thumbnail_label.config(image=thumbnail)
 
+            # Buttons frame
+            buttons_frame = tk.Frame(incident_frame, bg="#535353")
+            buttons_frame.pack(fill="x")
+
             # Play video button
-            play_button = tk.Button(incident_frame, text="Play", bg="darkcyan", fg="#FFFFFF",
+            play_button = tk.Button(buttons_frame, text="Play", bg="darkcyan", fg="#FFFFFF",
                                     command=lambda vf=video_file: self.play_video(vf))
-            play_button.pack(anchor="e", pady=5)
+            play_button.pack(side="right", padx=5)
+
+            # View log button
+            log_file = video_file.replace("_incident_video.mp4", "_incident_log.bin")  # Corresponding .bin file
+            view_log_button = tk.Button(buttons_frame, text="View Log", bg="yellow", fg="#000000",
+                                        command=lambda lf=log_file: self.view_log_file(lf))
+            view_log_button.pack(side="left", padx=5)
+
+    def view_log_file(self, log_file):
+        """View the log file by decompressing the .bin file, opening it in Notepad, and recompressing."""
+        log_file_path = os.path.join("incident_report", log_file)
+        temp_txt_file = log_file_path.replace(".bin", ".txt")
+
+        # Check if the .bin file exists
+        if not os.path.exists(log_file_path):
+            print(f"Log file not found: {log_file_path}")
+            return
+
+        # Decompress .bin to .txt
+        try:
+            cm.decompress_to_txt_file(log_file_path, temp_txt_file)
+            print(f"Decompressed {log_file_path} to {temp_txt_file}.")
+        except Exception as e:
+            print(f"Error decompressing log file: {e}")
+            return
+
+        # Open the .txt file in Notepad
+        os.system(f'notepad.exe "{temp_txt_file}"')
+
+        # After Notepad is closed, recompress the .txt back to .bin
+        try:
+            cm.compress_to_bin_file(temp_txt_file, log_file_path)
+            os.remove(temp_txt_file)  # Remove the temporary .txt file
+            print(f"Recompressed {temp_txt_file} back to {log_file_path}.")
+        except Exception as e:
+            print(f"Error recompressing log file: {e}")
 
     def generate_video_thumbnail(self, video_path):
         """Generate a thumbnail image from a video."""
