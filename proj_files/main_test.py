@@ -9,6 +9,7 @@ import torch
 import os
 from datetime import datetime
 from accelerometer_module import AccelerometerModule
+import compression_decompression_module as cm
 import threading
 
 
@@ -16,7 +17,7 @@ class VideoApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Yolo Object Detection Prototype")
-        self.root.geometry('1200x800')
+        self.root.geometry('895x870')
 
         # Styling variables
         bg_color = "#353535"
@@ -61,15 +62,22 @@ class VideoApp:
         self.main_frame.pack(fill=tk.BOTH, expand=True)
 
         # Configure grid weights
-        for i in range(4):
-            self.main_frame.grid_rowconfigure(i, weight=1)
-        self.main_frame.grid_columnconfigure(0, weight=3)
-        self.main_frame.grid_columnconfigure(1, weight=1)
+        #for i in range(4):
+        #    self.main_frame.grid_rowconfigure(i, weight=1)
+        #self.main_frame.grid_columnconfigure(0, weight=3)
+        #self.main_frame.grid_columnconfigure(1, weight=1)
 
         # Canvas for video output
-        self.canvas = tk.Canvas(self.main_frame, width=800, height=450, bg="#202020", borderwidth=0,
+        # Canvas for video output
+        self.canvas = tk.Canvas(self.main_frame, width=854, height=480, bg="#202020", borderwidth=0,
                                 highlightthickness=0)
-        self.canvas.grid(row=0, column=0, rowspan=3, columnspan=3, padx=20, pady=20, sticky='nsew')
+        self.canvas.grid(row=1, column=1, padx=20, pady=20, sticky='nsew')
+
+        # Configure grid weights for centering
+        for i in range(3):
+            self.main_frame.grid_rowconfigure(i, weight=1)
+        for j in range(3):
+            self.main_frame.grid_columnconfigure(j, weight=1)
 
         # Text frame
         text_frame = tk.Frame(self.main_frame, bg=bg_color)
@@ -78,7 +86,7 @@ class VideoApp:
         # Text boxes
         self.proximity_text_box = self.create_text_box(text_frame, height=10, width=65, side=tk.LEFT)
         self.text_box = self.create_text_box(text_frame, height=10, width=30)
-        self.area_text_box = self.create_text_box(text_frame, height=10, width=30)
+        #self.area_text_box = self.create_text_box(text_frame, height=10, width=30)
 
         self.initialize_textboxes()
 
@@ -139,7 +147,8 @@ class VideoApp:
         return text_box
 
     def initialize_textboxes(self):
-        for textbox in [self.text_box, self.area_text_box, self.proximity_text_box]:
+        #for textbox in [self.text_box, self.area_text_box, self.proximity_text_box]:
+        for textbox in [self.text_box, self.proximity_text_box]:
             textbox.config(state=tk.NORMAL)
             textbox.delete('1.0', tk.END)
             textbox.insert(tk.END, "Ready to load video...\n")
@@ -191,11 +200,11 @@ class VideoApp:
                 break
 
             passed_frames += 1
-            if passed_frames % 2 == 0:  # Skip every other frame for better performance
-                continue
+            #if passed_frames % 2 == 0:  # Skip every other frame for better performance
+            #    continue
 
-            frame = cv2.resize(frame, (800, 450))
-            results = self.model(frame, size=640)
+            frame = cv2.resize(frame, (854, 480))
+            results = self.model(frame, size=480)
 
             # Filter results
             detected_classes = results.pred[0][:, -1].cpu().numpy()
@@ -211,8 +220,8 @@ class VideoApp:
             self.update_textbox(objects_count)
 
             # Calculate and update bounding box areas
-            bounding_box_areas = self.calculate_areas(detected_boxes)
-            self.update_area_textbox(bounding_box_areas, object_names)
+            #bounding_box_areas = self.calculate_areas(detected_boxes)
+            #self.update_area_textbox(bounding_box_areas, object_names)
 
             # Draw bounding boxes with unique names and line at the bottom
             frame = self.draw_bounding_boxes(frame, detected_boxes, detected_classes, object_names)
@@ -333,26 +342,36 @@ class VideoApp:
         self.root.update_idletasks()  # Limit to essential GUI updates
 
     def update_textbox(self, objects_count):
+        # Define the desired order of object names
+        ordered_classes = ['person', 'ball', 'tree', 'car']
+
+        # Ensure all classes are represented with a count of 0 by default
+        all_objects_count = {name: 0 for name in ordered_classes}
+        for name, count in objects_count.items():
+            if name in all_objects_count:
+                all_objects_count[name] = count
+
+        # Update the text box with the counts in the desired order
         self.text_box.config(state=tk.NORMAL)
         self.text_box.delete('1.0', tk.END)
-        for name, count in objects_count.items():
-            self.text_box.insert(tk.END, f"{name}: {count}\n")
+        for name in ordered_classes:
+            self.text_box.insert(tk.END, f"{name}: {all_objects_count[name]}\n")
         self.text_box.config(state=tk.DISABLED)
 
-    def update_area_textbox(self, bounding_box_areas, object_names):
-        self.area_text_box.config(state=tk.NORMAL)
-        self.area_text_box.delete('1.0', tk.END)
-        for name, area in zip(object_names, bounding_box_areas):
-            self.area_text_box.insert(tk.END, f"{name} Area: {area:.2f} px\n")
-        self.area_text_box.config(state=tk.DISABLED)
+    #def update_area_textbox(self, bounding_box_areas, object_names):
+    #    self.area_text_box.config(state=tk.NORMAL)
+    #    self.area_text_box.delete('1.0', tk.END)
+    #    for name, area in zip(object_names, bounding_box_areas):
+    #        self.area_text_box.insert(tk.END, f"{name} Area: {area:.2f} px\n")
+    #    self.area_text_box.config(state=tk.DISABLED)
 
-    def calculate_areas(self, boxes):
-        areas = []
-        for box in boxes:
-            x1, y1, x2, y2 = box
-            area = (x2 - x1) * (y2 - y1)
-            areas.append(area)
-        return areas
+    #def calculate_areas(self, boxes):
+    #    areas = []
+    #    for box in boxes:
+    #        x1, y1, x2, y2 = box
+    #        area = (x2 - x1) * (y2 - y1)
+    #        areas.append(area)
+    #    return areas
 
     def start_recording(self, frame):
         self.recording = True
@@ -368,13 +387,37 @@ class VideoApp:
         self.out = cv2.VideoWriter(video_filename, fourcc, 20.0, (frame.shape[1], frame.shape[0]))
         self.log_file = open(log_filename, "w")
 
+    # v .txt datoteko se incidenti zapisejo v formatu:
+    # [min_distance]
+    # [person_count]
+    # [ball_count]
+    # [tree_count]
+    # [car_count]
+    # ...
     def stop_recording(self):
         self.recording = False
         self.out.release()
         for data in self.log_data:
             frame_number, object_count, min_distance = data
-            self.log_file.write(f"f:{frame_number}\n{object_count.strip()}\nMin_d: {min_distance}\n---------------------------\n")
+
+            # Extract only the counts (numbers) from object_count
+            counts = [line.split(":")[1].strip() for line in object_count.splitlines() if ":" in line]
+
+            # Write min_distance followed by each count on its own line
+            self.log_file.write(f"{min_distance}\n")
+            for count in counts:
+                self.log_file.write(f"{count}\n")
         self.log_file.close()
+
+        # Get the log file name
+        log_file_name = self.log_file.name
+
+        # Compress the log file into a .bin file
+        bin_file_name = log_file_name.replace(".txt", ".bin")  # Replace .txt extension with .bin
+        cm.compress_to_bin_file(log_file_name, bin_file_name)
+
+        print(f"Log file saved to {log_file_name}")
+        print(f"Compressed binary file saved to {bin_file_name}")
 
     # ------------------------- beeping
     def beep_control(self):
@@ -446,6 +489,10 @@ class VideoApp:
     # ------------------------- Accelerometer
 
     def start_accelerometer_reader(self):
+        if not self.accelerometer.connected:
+            print("Accelerometer not connected. Skipping accelerometer reader.")
+            return
+
         def read_data():
             while self.running:
                 packet = self.accelerometer.read_packet()
@@ -460,7 +507,8 @@ class VideoApp:
                             print("Vozimo NAPREJ")
                         else:
                             print("Unknown packet...")
-                time.sleep(0.01)  # Reduce CPU usage by adding a small delay
+                    else:
+                        print(f"Invalid packet header: {hex(header)}")
 
         self.accelerometer_thread = threading.Thread(target=read_data, daemon=True)
         self.accelerometer_thread.start()
@@ -468,7 +516,8 @@ class VideoApp:
     def on_close(self):
         """Cleanly shuts down the application and accelerometer."""
         self.running = False
-        self.accelerometer.close()  # Ensure the accelerometer connection is closed
+        if self.accelerometer.connected:
+            self.accelerometer.close()  # Ensure the accelerometer connection is closed
         self.root.destroy()
 
 if __name__ == "__main__":

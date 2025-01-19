@@ -1,23 +1,4 @@
 import random
-import time
-
-# Function to generate a random number within a specified range
-def random_in_range(start, end):
-    return random.randint(start, end)
-
-# Function to generate numbers with a maximum difference of 'diff' from the previous number
-def random_with_diff(number, diff):
-    result = []
-    first_number = random_in_range(0, 255)
-    result.append(first_number)
-
-    for _ in range(1, number):
-        prev_number = result[-1]
-        new_number = prev_number + random_in_range(-diff, diff)
-        new_number = max(0, min(255, new_number))
-        result.append(new_number)
-
-    return result
 
 # Function to add bits to a binary stream
 def add_bits(binary_stream, value, num_bits):
@@ -37,7 +18,7 @@ def compression(number_list):
         diff = number_list[i] - number_list[i - 1]
         diff_list.append(diff)
 
-    print("Difference list:", diff_list)  # Output the corrected difference list
+    #print("Difference list:", diff_list)  # Output the corrected difference list
 
     i = 1  # Start from the first difference (skip the initial value)
     while i < len(diff_list):
@@ -45,7 +26,7 @@ def compression(number_list):
 
         if -30 <= diff <= 30 and diff != 0:
             add_bits(binary_stream, 0, 2)  # Prefix 00 for difference encoding
-            
+
             if -2 <= diff <= 2:
                 add_bits(binary_stream, 0, 2)
                 add_bits(binary_stream, diff + 2 if diff < 0 else diff + 1, 2)
@@ -100,7 +81,7 @@ def decompression(compressed_stream):
 
         if prefix == 0b00:
             sub_prefix, position = read_bits(binary_string, position, 2)
-            
+
             if sub_prefix == 0b00:
                 delta, position = read_bits(binary_string, position, 2)
                 delta = delta - 2 if delta < 2 else delta - 1
@@ -131,17 +112,52 @@ def decompression(compressed_stream):
     return decompressed_numbers
 
 
-# Example usage
-def main():
-    random.seed(time.time())
+# Function to read numbers from a text file, compress them, and write to a .bin file
+def compress_to_bin_file(input_txt_file, output_bin_file):
+    # Read numbers from the text file
+    try:
+        with open(input_txt_file, 'r') as file:
+            numbers = [int(line.strip()) for line in file if line.strip().isdigit()]
+    except FileNotFoundError:
+        print(f"Error: The file {input_txt_file} does not exist.")
+        return
 
-    example_numbers = [55, 530, 53, 53, 5300, 53, 10, 10, 11, 11, 11, 11]
 
-    compressed = compression(example_numbers)
-    print("Compressed binary stream:", binary_stream_to_string(compressed))
+    # Compress the numbers
+    compressed_stream = compression(numbers)
 
-    decompressed = decompression(compressed)
-    print("Decompressed numbers:", decompressed)
+    # Convert binary stream to bytes
+    byte_array = bytearray()
+    for i in range(0, len(compressed_stream), 8):
+        byte = 0
+        for bit in compressed_stream[i:i + 8]:
+            byte = (byte << 1) | bit
+        byte_array.append(byte)
 
-if __name__ == "__main__":
-    main()
+    # Write the compressed bytes to a binary file
+    with open(output_bin_file, 'wb') as file:
+        file.write(byte_array)
+
+# Function to read a .bin file, decompress the numbers, and write to a .txt file
+def decompress_to_txt_file(input_bin_file, output_txt_file):
+    # Read the binary file
+    try:
+        with open(input_bin_file, 'rb') as file:
+            byte_array = file.read()
+    except FileNotFoundError:
+        print(f"Error: The file {input_bin_file} does not exist.")
+        return
+
+    # Convert bytes back to binary stream
+    binary_stream = []
+    for byte in byte_array:
+        for i in range(7, -1, -1):
+            binary_stream.append((byte >> i) & 1)
+
+    # Decompress the binary stream
+    decompressed_numbers = decompression(binary_stream)
+
+    # Write the decompressed numbers to the text file
+    with open(output_txt_file, 'w') as file:
+        for number in decompressed_numbers:
+            file.write(f"{number}\n")
