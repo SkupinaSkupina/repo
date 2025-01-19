@@ -12,9 +12,11 @@ class AccelerometerModule:
         """Attempt to establish a connection to the serial port."""
         try:
             self.ser = serial.Serial(self.port, self.baud_rate, timeout=self.timeout)
+            self.connected = True
             print(f"Connected to {self.port} at {self.baud_rate} baud")
         except serial.SerialException as e:
-            print(f"Failed to connect to {self.port}: {e}")
+            self.connected = False
+            print(f"No connection to {self.port}: {e}")
 
     def close(self):
         """Closes the serial connection."""
